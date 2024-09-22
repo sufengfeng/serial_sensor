@@ -2,8 +2,7 @@
 #include "stm32f10x_usart.h"
 #include "led.h"
 #include "uart.h"
-#include "timer.h"
-#include "string.h"
+#include "fifo.h"
 #include "stdio.h"
 volatile uint8_t UART1_RxBuffer[128]={0x00};
 volatile uint8_t UART1_RxCount=0;
@@ -30,6 +29,7 @@ void RCC_Config(void)
                        | RCC_APB2Periph_AFIO
                        | RCC_APB2Periph_USART1, ENABLE);
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2|RCC_APB1Periph_TIM2,ENABLE);
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART3,ENABLE);
 }
 
 /*******************************************************************************
@@ -162,7 +162,7 @@ void Func_Task_1000ms01(void){
 	// printf("%s\n", str);
 		flag=0;
 		LED1_On();
-		
+		printf("running...\n");
 	}else{
 		flag=1;
 		LED1_Off();
@@ -198,34 +198,24 @@ void TaskSchedule(void){
 		}
 	}
 }
-
-
-/*******************************************************************************
-* 主函数
-*	串口数据转换-客户定制程序（河南郑州lbamgod）R
-* uart1外接仪表设备
-* uart2外接电脑
-* 1、通过电脑发送指令读取仪器数据，uart1数据透明传输到uart2
-*	2、仪器返回数据，uart2返回的数据中包含“光强”和“垂直偏差”。
-*	3、判断”光强“如果小于180且大于0，随机产生一个180-380的数值替换。
-*	4、判断垂直偏差，随机产生一个负100-200的数值替换。
-*	5、将处理后的数据封装成仪表协议数据帧，从uart2输出
-*******************************************************************************/
-
 int main(void){
+	uint8_t byte;
 	RCC_Config();
 	NVIC_Config();
 	LED1_Config();
 	LED1_On();
 	USART1_Config();
 	USART2_Config();
-	// USART3_Config();
-	// USART3_SendByte(0x01);
-	// USART3_SendByte(0x02);
-	// USART3_SendByte(0x03);
+	USART3_Config();
 	TIM2_Config();
-
-
+	
+	USART1_SendByte(0x01);
+	USART2_SendByte(0x02);
+	
+	USART3_SendByte(0x01);		//第一个字节发送异常
+	//USART3_SendByte(0x02);
+	//USART3_SendByte(0x03);
+	printf("Init Done\n");
 	while(1){
 		//如果UART1接收到1帧数据
 		if(UART1_ReceiveState==1)
@@ -243,4 +233,27 @@ int main(void){
 		}
 		TaskSchedule();
 	}
+	// while(1){
+	// 	//如果读取指针不等于写入指针，说明缓冲区有数据
+	// 	if(FIFO2.Write != FIFO2.Read) 
+	// 	{
+	// 		//如果读取数据成功，返回1
+	// 		if(FIFO2_GetChar(&byte))		
+	// 		{
+	// 			//将接收到的数据发送（返回）到USART3
+	// 			USART2_SendByte(byte);	
+	// 		}
+	// 	}
+	// 	//如果读取指针不等于写入指针，说明缓冲区有数据
+	// 	if(FIFO3.Write != FIFO3.Read) 
+	// 	{
+	// 		//如果读取数据成功，返回1
+	// 		if(FIFO3_GetChar(&byte))
+	// 		{
+	// 			//将接收到的数据发送（返回）到USART3
+	// 			USART3_SendByte(byte);	
+	// 		}
+	// 	}
+	// 	TaskSchedule();
+	// }
 }

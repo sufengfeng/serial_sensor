@@ -28,14 +28,14 @@ void USART1_Config(void){
 	NVIC_InitTypeDef  NVIC_InitStructure;
 	//清除中断标识
 	USART_ClearFlag(USARTx,USART_FLAG_TC);
-	//复位串口
+	//复位串口x
 	USART_DeInit(USARTx);
 	//配置TXD
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
 	GPIO_Init(GPIOA,&GPIO_InitStructure);
-	//配置RXD
+	//配置TXD
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
 	GPIO_Init(GPIOA,&GPIO_InitStructure);
@@ -45,7 +45,7 @@ void USART1_Config(void){
 	USART_ClockInitStructure.USART_CPHA = USART_CPHA_2Edge;
 	USART_ClockInitStructure.USART_LastBit = USART_LastBit_Disable;
 	USART_ClockInit(USARTx,&USART_ClockInitStructure);
-	USART_InitStructure.USART_BaudRate = 9600;
+	USART_InitStructure.USART_BaudRate = 115200;
 	USART_InitStructure.USART_WordLength = USART_WordLength_8b;
 	USART_InitStructure.USART_StopBits = USART_StopBits_1;
 	USART_InitStructure.USART_Parity = USART_Parity_No;
@@ -66,7 +66,7 @@ void USART1_Config(void){
 	USART_ITConfig(USARTx, USART_IT_IDLE, ENABLE);
 	//打开串口接收中断
 	USART_ITConfig(USARTx, USART_IT_RXNE, ENABLE);
-	USART_Cmd(USARTx,ENABLE);    
+	USART_Cmd(USARTx,ENABLE);   
 }
 
 /*******************************************************************************
@@ -90,7 +90,7 @@ void USART2_Config(void){
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
 	GPIO_Init(GPIOA,&GPIO_InitStructure);
-	//配置RXD
+	//配置TXD
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_3;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
 	GPIO_Init(GPIOA,&GPIO_InitStructure);
@@ -100,7 +100,7 @@ void USART2_Config(void){
 	USART_ClockInitStructure.USART_CPHA = USART_CPHA_2Edge;
 	USART_ClockInitStructure.USART_LastBit = USART_LastBit_Disable;
 	USART_ClockInit(USARTx,&USART_ClockInitStructure);
-	USART_InitStructure.USART_BaudRate = 9600;
+	USART_InitStructure.USART_BaudRate = 115200;
 	USART_InitStructure.USART_WordLength = USART_WordLength_8b;
 	USART_InitStructure.USART_StopBits = USART_StopBits_1;
 	USART_InitStructure.USART_Parity = USART_Parity_No;
@@ -121,7 +121,7 @@ void USART2_Config(void){
 	USART_ITConfig(USARTx, USART_IT_IDLE, ENABLE);
 	//打开串口接收中断
 	USART_ITConfig(USARTx, USART_IT_RXNE, ENABLE);
-	USART_Cmd(USARTx,ENABLE);  
+	USART_Cmd(USARTx,ENABLE); 
 }
 
 /*******************************************************************************
@@ -141,7 +141,7 @@ void USART3_Config(void){
 	//复位串口
 	USART_DeInit(USARTx);
 	//配置485
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_12;
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_15;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
 	GPIO_Init(GPIOA,&GPIO_InitStructure);
@@ -181,6 +181,7 @@ void USART3_Config(void){
 	USART_ITConfig(USARTx, USART_IT_RXNE, ENABLE);
 	USART_Cmd(USARTx,ENABLE);  
 }
+
 /*******************************************************************************
 * Function Name : USART1_IRQHandler 
 * Description   : 串口1中断服务程序
@@ -236,6 +237,7 @@ void USART2_IRQHandler(void)
 		UART2_ReceiveState=1;
 	}
 }
+
 /*******************************************************************************
 * Function Name : USART3_IRQHandler 
 * Description   : 串口3中断服务程序
@@ -262,47 +264,6 @@ void USART3_IRQHandler(void)
 		//标记接收到了1帧数据
 		UART2_ReceiveState=1;
 	}
-}
-#include "stdio.h"
-#if 1
-#pragma import(__use_no_semihosting)
-//标准库需要的支持函数
-struct __FILE
-{
-    int handle;
-};
- 
-FILE __stdout;
-/**
- * @brief 定义_sys_exit()以避免使用半主机模式
- * @param void
- * @return  void
- */
-void _sys_exit(int x)
-{
-    x = x;
-}
- 
-int fputc(int ch, FILE *f)
-{
-    //while((USART1->ISR & 0X40) == 0); //循环发送,直到发送完毕
- 	while(USART_GetFlagStatus(USART1, USART_FLAG_TC) != SET);
-    USART1->DR = (u8) ch;
-	
-    return ch;
-}
-#endif
-
-/*******************************************************************************
-* Function Name : USART_SendByte 
-* Description   : 向USARTx发送一个字节
-									Data = 要发送的数据
-* Return        : None 
-*******************************************************************************/
-void USART_SendByte(USART_TypeDef* USARTx,uint16_t Data)
-{
-	USARTx->DR = (Data & (uint16_t)0x01FF);
-	while(USART_GetFlagStatus(USARTx, USART_FLAG_TC) != SET);
 }
 
 /*******************************************************************************
@@ -343,3 +304,32 @@ void USART3_SendByte(uint16_t Data)
 	USARTx->DR = (Data & (uint16_t)0x01FF);
 	while(USART_GetFlagStatus(USARTx, USART_FLAG_TC) != SET);
 }
+
+#include "stdio.h"
+#if 1
+#pragma import(__use_no_semihosting)
+//标准库需要的支持函数
+struct __FILE
+{
+    int handle;
+};
+ 
+FILE __stdout;
+/**
+ * @brief 定义_sys_exit()以避免使用半主机模式
+ * @param void
+ * @return  void
+ */
+void _sys_exit(int x)
+{
+    x = x;
+}
+ 
+int fputc(int ch, FILE *f)
+{
+	USART_TypeDef* USARTx=USART3;
+	USARTx->DR = (ch & (uint16_t)0x01FF);
+	while(USART_GetFlagStatus(USARTx, USART_FLAG_TC) != SET);
+    return ch;
+}
+#endif
