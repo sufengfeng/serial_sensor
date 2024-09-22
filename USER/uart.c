@@ -30,15 +30,28 @@ void USART1_Config(void){
 	USART_ClearFlag(USARTx,USART_FLAG_TC);
 	//∏¥Œª¥Æø⁄x
 	USART_DeInit(USARTx);
+	 // ≈‰÷√÷ÿ”≥…‰
+    GPIO_PinRemapConfig(GPIO_Remap_USART1, ENABLE);
+1
+	// //≈‰÷√TXD
+	// GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9;
+	// GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
+	// GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+	// GPIO_Init(GPIOA,&GPIO_InitStructure);
+	// //≈‰÷√TXD
+	// GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10;
+	// GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
+	// GPIO_Init(GPIOA,&GPIO_InitStructure);
+
 	//≈‰÷√TXD
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9;
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_Init(GPIOA,&GPIO_InitStructure);
+	GPIO_Init(GPIOB,&GPIO_InitStructure);
 	//≈‰÷√TXD
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10;
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_7;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
-	GPIO_Init(GPIOA,&GPIO_InitStructure);
+	GPIO_Init(GPIOB,&GPIO_InitStructure);
 	//≈‰÷√USART
 	USART_ClockInitStructure.USART_Clock = USART_Clock_Disable;
 	USART_ClockInitStructure.USART_CPOL = USART_CPOL_Low;
