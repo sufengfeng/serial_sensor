@@ -32,7 +32,7 @@ void USART1_Config(void){
 	USART_DeInit(USARTx);
 	 // ≈‰÷√÷ÿ”≥…‰
     GPIO_PinRemapConfig(GPIO_Remap_USART1, ENABLE);
-1
+
 	// //≈‰÷√TXD
 	// GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9;
 	// GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;

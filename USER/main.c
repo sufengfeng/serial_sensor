@@ -30,6 +30,7 @@ void RCC_Config(void)
                        | RCC_APB2Periph_USART1, ENABLE);
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2|RCC_APB1Periph_TIM2,ENABLE);
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART3,ENABLE);
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
 }
 
 /*******************************************************************************
@@ -163,6 +164,7 @@ void Func_Task_1000ms01(void){
 		flag=0;
 		LED1_On();
 		printf("running...\n");
+		Uart_SendByte(0x04);
 	}else{
 		flag=1;
 		LED1_Off();
@@ -198,6 +200,7 @@ void TaskSchedule(void){
 		}
 	}
 }
+extern int main1(void);
 int main(void){
 	uint8_t byte;
 	RCC_Config();
@@ -215,7 +218,10 @@ int main(void){
 	USART3_SendByte(0x01);		//第一个字节发送异常
 	//USART3_SendByte(0x02);
 	//USART3_SendByte(0x03);
+	USART_GPIO_Init();		//初始化串口GPIO
+	Timer3_Init(9600);			//初始化定时器3
 	printf("Init Done\n");
+	// main1();
 	while(1){
 		//如果UART1接收到1帧数据
 		if(UART1_ReceiveState==1)
@@ -232,28 +238,9 @@ int main(void){
 			UART2_RxCount=0;
 		}
 		TaskSchedule();
+		if(GetUartIOCounter()>0)	{
+			printf("GetUartIOCounter:%d\n",GetUartIOCounter());
+			printf("Received data: %d\n",Uart_ReceiveByte());
+		}
 	}
-	// while(1){
-	// 	//如果读取指针不等于写入指针，说明缓冲区有数据
-	// 	if(FIFO2.Write != FIFO2.Read) 
-	// 	{
-	// 		//如果读取数据成功，返回1
-	// 		if(FIFO2_GetChar(&byte))		
-	// 		{
-	// 			//将接收到的数据发送（返回）到USART3
-	// 			USART2_SendByte(byte);	
-	// 		}
-	// 	}
-	// 	//如果读取指针不等于写入指针，说明缓冲区有数据
-	// 	if(FIFO3.Write != FIFO3.Read) 
-	// 	{
-	// 		//如果读取数据成功，返回1
-	// 		if(FIFO3_GetChar(&byte))
-	// 		{
-	// 			//将接收到的数据发送（返回）到USART3
-	// 			USART3_SendByte(byte);	
-	// 		}
-	// 	}
-	// 	TaskSchedule();
-	// }
 }

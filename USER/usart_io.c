@@ -4,9 +4,9 @@
 #include "stm32f10x_usart.h"
 
 // 定义一些常量
-#define BAUD_RATE 9600
-#define TIMER_PRESCALER 7200
-#define TIMER_PERIOD ((SystemCoreClock / TIMER_PRESCALER) / BAUD_RATE)
+// #define BAUD_RATE 9600
+#define TIMER_PRESCALER 72
+// #define TIMER_PERIOD ((72000000 / TIMER_PRESCALER) / BAUD_RATE)
 
 // 发送缓冲区和接收缓冲区
 uint8_t sendBuffer[64];
@@ -18,16 +18,21 @@ uint8_t receiveIndex = 0;
 volatile uint8_t sending = 0;
 volatile uint8_t receiving = 0;
 
-void Timer3_Init(void);
+// void Timer3_Init(void);
+void Timer3_Init(int BAUD_RATE);
 void USART_GPIO_Init(void);
 void Uart_SendByte(uint8_t data);
 uint8_t Uart_ReceiveByte(void);
 void TIM3_IRQHandler(void);
+uint8_t GetUartIOCounter(void){
+    return receiveIndex;
+}
 
 int main1(void)
 {
-    Timer3_Init();
-    USART_GPIO_Init();
+	USART_GPIO_Init();
+    Timer3_Init(9600);
+   
 
     // 假设要发送的数据
     sendBuffer[0] = 'H';
@@ -37,27 +42,29 @@ int main1(void)
     sendBuffer[4] = 'o';
     sendBuffer[5] = '\n';
     sendIndex = 6;
-
+    //Uart_SendByte(0x04);
     while (1)
     {
         // 处理接收的数据
         if (receiveIndex > 0)
         {
             // 在这里可以对接收的数据进行处理
-            for (int i = 0; i < receiveIndex; i++)
-            {
-                // 例如，将接收到的数据再次发送出去
-                sendBuffer[sendIndex++] = receiveBuffer[i];
-            }
+            // for (int i = 0; i < receiveIndex; i++)
+            // {
+            //     // 例如，将接收到的数据再次发送出去
+            //     sendBuffer[sendIndex++] = receiveBuffer[i];
+            // }
+            printf("Received data: %d\n",Uart_ReceiveByte());
             receiveIndex = 0;
         }
     }
 }
-
-void Timer3_Init(void)
+void Timer3_Init(int BAUD_RATE)
 {
     // 开启定时器 3 时钟
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
+    TIM_Cmd(TIM3, DISABLE);
+    int TIMER_PERIOD=(1000000/ BAUD_RATE);
 
     TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
     TIM_TimeBaseStructure.TIM_Period = TIMER_PERIOD - 1;
@@ -128,10 +135,23 @@ uint8_t Uart_ReceiveByte(void)
     return 0;
 }
 
+
 void TIM3_IRQHandler(void)
 {
     if (TIM_GetITStatus(TIM3, TIM_IT_Update)!= RESET)
     {
+        // static int flag=0;
+        // if(flag==0) {
+        //     flag=1;
+        //     GPIO_SetBits(GPIOA, GPIO_Pin_9);
+        // }else {
+        //     flag=0;
+        //     GPIO_ResetBits(GPIOA, GPIO_Pin_9);
+        // }
+
+        // TIM_ClearITPendingBit(TIM3, TIM_IT_Update);
+        // return ;
+        
         if (sending)
         {
             static uint8_t dataToSend;

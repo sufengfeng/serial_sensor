@@ -32,6 +32,7 @@ enum
 #define T_FIRST		0x33	//延时到第一位的时间
  
 #define MAX_BUFSIZE	3000	//收发最大字符数量
+ uint8_t GetUartIOCounter(void);
  
  
 
