@@ -15,7 +15,9 @@ uint8_t sendIndex = 0;
 // 发送和接收状态标志
 volatile uint8_t sending = 0;
 volatile uint8_t receiving = 0;
-
+extern uint8_t UART_IO_RxBuffer[128];
+extern uint8_t UART_IO_RxCount;
+extern uint8_t UART_IO_ReceiveState;
 
 // void Timer3_Init(int BAUD_RATE);
 void USART_GPIO_Init(void);
@@ -55,14 +57,14 @@ int main1(void)
         // }
     }
 }
-int l_nUartWordLength = 8;
+static int l_nUartWordLength = 8;
 
 void Timer3_Init(int BAUD_RATE,int USART_WordLength)
 {
     l_nUartWordLength = USART_WordLength;       //设置有效位
     // 开启定时器 3 时钟
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
-    TIM_Cmd(TIM3, DISABLE);
+    TIM_Cmd(TIM3, DISABLE);     //关闭定时器，防止冲突
     int TIMER_PERIOD=(1000000/ BAUD_RATE);
 
     TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
@@ -82,7 +84,10 @@ void Timer3_Init(int BAUD_RATE,int USART_WordLength)
     NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
     NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
     NVIC_Init(&NVIC_InitStructure);
-
+    sendIndex = 0;
+    UART_IO_RxCount=0;
+    UART_IO_ReceiveState=0;
+    // 启动定时器
     TIM_Cmd(TIM3, ENABLE);
 }
 
@@ -127,9 +132,7 @@ void Uart_SendByte(uint8_t data)
     }
 }
 
-extern uint8_t UART_IO_RxBuffer[128];
-extern uint8_t UART_IO_RxCount;
-extern uint8_t UART_IO_ReceiveState;
+
 
 void TIM3_IRQHandler(void)
 {

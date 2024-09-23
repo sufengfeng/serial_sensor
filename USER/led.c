@@ -13,6 +13,22 @@ void LED1_Config(void){
 	gpioInit.GPIO_Pin=GPIO_Pin_1;
 	gpioInit.GPIO_Speed=GPIO_Speed_2MHz;
 	GPIO_Init(GPIOB,&gpioInit);
+
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA,ENABLE);
+	gpioInit.GPIO_Mode=GPIO_Mode_Out_PP;
+	gpioInit.GPIO_Pin=GPIO_Pin_5;
+	gpioInit.GPIO_Speed=GPIO_Speed_2MHz;
+	GPIO_Init(GPIOA,&gpioInit);
+
+	gpioInit.GPIO_Mode=GPIO_Mode_Out_PP;
+	gpioInit.GPIO_Pin=GPIO_Pin_6;
+	gpioInit.GPIO_Speed=GPIO_Speed_2MHz;
+	GPIO_Init(GPIOA,&gpioInit);
+
+	gpioInit.GPIO_Mode=GPIO_Mode_Out_PP;
+	gpioInit.GPIO_Pin=GPIO_Pin_7;
+	gpioInit.GPIO_Speed=GPIO_Speed_2MHz;
+	GPIO_Init(GPIOA,&gpioInit);
 }
 
 /*******************************************************************************
