@@ -10,9 +10,9 @@
 
 // 发送缓冲区和接收缓冲区
 uint8_t sendBuffer[64];
-uint8_t receiveBuffer[64];
+// uint8_t receiveBuffer[64];
 uint8_t sendIndex = 0;
-uint8_t receiveIndex = 0;
+// uint8_t receiveIndex = 0;
 
 // 发送和接收状态标志
 volatile uint8_t sending = 0;
@@ -24,9 +24,9 @@ void USART_GPIO_Init(void);
 void Uart_SendByte(uint8_t data);
 uint8_t Uart_ReceiveByte(void);
 void TIM3_IRQHandler(void);
-uint8_t GetUartIOCounter(void){
-    return receiveIndex;
-}
+// uint8_t GetUartIOCounter(void){
+//     return receiveIndex;
+// }
 
 int main1(void)
 {
@@ -46,17 +46,17 @@ int main1(void)
     while (1)
     {
         // 处理接收的数据
-        if (receiveIndex > 0)
-        {
+        // if (receiveIndex > 0)
+        // {
             // 在这里可以对接收的数据进行处理
             // for (int i = 0; i < receiveIndex; i++)
             // {
             //     // 例如，将接收到的数据再次发送出去
             //     sendBuffer[sendIndex++] = receiveBuffer[i];
             // }
-            printf("Received data: %d\n",Uart_ReceiveByte());
-            receiveIndex = 0;
-        }
+        //     printf("Received data: %d\n",Uart_ReceiveByte());
+        //     receiveIndex = 0;
+        // }
     }
 }
 void Timer3_Init(int BAUD_RATE)
@@ -105,6 +105,15 @@ void USART_GPIO_Init(void)
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
     GPIO_Init(GPIOA, &GPIO_InitStructure);
 }
+void Uart_SendByteStr(uint8_t *str,int len)
+{
+    for(int i=0;i<len;i++){
+        while (sending){    
+            // 等待发送完成           
+        }
+        Uart_SendByte(str[i]);
+    }
+}
 
 
 void Uart_SendByte(uint8_t data)
@@ -119,22 +128,25 @@ void Uart_SendByte(uint8_t data)
     }
 }
 
-uint8_t Uart_ReceiveByte(void)
-{
-    if (receiveIndex > 0)
-    {
-        uint8_t data = receiveBuffer[0];
-        // 将接收缓冲区中的数据向前移动
-        for (int i = 0; i < receiveIndex - 1; i++)
-        {
-            receiveBuffer[i] = receiveBuffer[i + 1];
-        }
-        receiveIndex--;
-        return data;
-    }
-    return 0;
-}
+// uint8_t Uart_ReceiveByte(void)
+// {
+//     if (receiveIndex > 0)
+//     {
+//         uint8_t data = receiveBuffer[0];
+//         // 将接收缓冲区中的数据向前移动
+//         for (int i = 0; i < receiveIndex - 1; i++)
+//         {
+//             receiveBuffer[i] = receiveBuffer[i + 1];
+//         }
+//         receiveIndex--;
+//         return data;
+//     }
+//     return 0;
+// }
 
+extern uint8_t UART_IO_RxBuffer[128];
+extern uint8_t UART_IO_RxCount;
+extern uint8_t UART_IO_ReceiveState;
 
 void TIM3_IRQHandler(void)
 {
@@ -197,13 +209,23 @@ void TIM3_IRQHandler(void)
         {
             static uint8_t receivedData = 0;
             static uint8_t bitIndex = 0;
-
+            static uint8_t busIdelCounter = 0;      //总线空闲计数
+            #define MAX_IDEL_TIME  (100) //总线空闲时间
             if (bitIndex == 0)
             {
                 if (GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_10) == 0)
                 {
                     // 检测到开始位
                     bitIndex++;
+                    busIdelCounter=0;
+                }else{
+                    if(busIdelCounter++>MAX_IDEL_TIME){  
+                        busIdelCounter=MAX_IDEL_TIME;
+                        if (UART_IO_RxCount>0)  //接收缓冲区有数据,且有数据空闲时间超过MAX_IDEL_TIME
+                        {
+                            UART_IO_ReceiveState=1;    
+                        }
+                    }
                 }
             }
             else if (bitIndex > 0 && bitIndex <= 8)
@@ -217,7 +239,9 @@ void TIM3_IRQHandler(void)
             else if (bitIndex == 9)
             {
                 // 检测到停止位
-                receiveBuffer[receiveIndex++] = receivedData;
+                // receiveBuffer[receiveIndex++] = receivedData;
+                //把接收到的字节保存，数组地址加1
+		        UART_IO_RxBuffer[UART_IO_RxCount++] = receivedData;
                 bitIndex = 0;
             }
         }

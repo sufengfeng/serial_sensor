@@ -113,7 +113,7 @@ void USART2_Config(void){
 	USART_ClockInitStructure.USART_CPHA = USART_CPHA_2Edge;
 	USART_ClockInitStructure.USART_LastBit = USART_LastBit_Disable;
 	USART_ClockInit(USARTx,&USART_ClockInitStructure);
-	USART_InitStructure.USART_BaudRate = 115200;
+	USART_InitStructure.USART_BaudRate = 19200;
 	USART_InitStructure.USART_WordLength = USART_WordLength_8b;
 	USART_InitStructure.USART_StopBits = USART_StopBits_1;
 	USART_InitStructure.USART_Parity = USART_Parity_No;
@@ -291,7 +291,12 @@ void USART1_SendByte(uint16_t Data)
 	USARTx->DR = (Data & (uint16_t)0x01FF);
 	while(USART_GetFlagStatus(USARTx, USART_FLAG_TC) != SET);
 }
-
+int USART1_SendStr(uint8_t *str,uint8_t len){
+	while(*str!='\0')
+	{
+		USART1_SendByte(*str++);
+	}
+}
 /*******************************************************************************
 * Function Name : USART1_SendByte 
 * Description   : 向USART1发送一个字节
@@ -303,6 +308,13 @@ void USART2_SendByte(uint16_t Data)
 	USART_TypeDef* USARTx=USART2;
 	USARTx->DR = (Data & (uint16_t)0x01FF);
 	while(USART_GetFlagStatus(USARTx, USART_FLAG_TC) != SET);
+}
+
+int USART2_SendStr(uint8_t *str,uint8_t len){
+	while(*str!='\0')
+	{
+		USART2_SendByte(*str++);
+	}
 }
 
 /*******************************************************************************

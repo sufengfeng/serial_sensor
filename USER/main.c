@@ -15,6 +15,10 @@ volatile uint8_t UART2_ReceiveState=0;
 volatile uint8_t UART3_RxBuffer[128]={0x00};
 volatile uint8_t UART3_RxCount=0;
 volatile uint8_t UART3_ReceiveState=0;
+
+volatile uint8_t UART_IO_RxBuffer[128]={0x00};
+volatile uint8_t UART_IO_RxCount=0;
+volatile uint8_t UART_IO_ReceiveState=0;
 /*******************************************************************************
 * Function Name  : RCC_Config
 * Description    : 外设配置
@@ -102,6 +106,39 @@ void Frame_Handler_(USART_TypeDef* USARTin,USART_TypeDef* USARTout,volatile uint
 uint8_t PR4_COMMAND_PRESSURE[]="PR";
 uint8_t PACE_COMMAND_PRESSURE[]={0x3A,0x53,0x65,0x6E,0x73,0x3F,0x0D,0x0A};
 uint8_t PACE_RESULT_HEAD[]=":SEHS:PRES";
+#define RP_COMMAND	"*RP?:25\r\n"
+float g_nV_psi=0;
+/*******************************************************************************
+* Function Name : UART2_Frame_Handler 
+* Description   : 处理数据帧（提取完整数据帧，并校正数据）
+* Input         : None
+* Return        : None 
+*******************************************************************************/
+void UART2_Frame_Handler(USART_TypeDef* USARTtype,volatile uint8_t buffer[],volatile uint8_t count){
+	printf("[%s%d][%s][%d]\n",__func__,__LINE__,buffer,count);
+	if(strcmp("!rp=",(const char*)buffer)<=0){	//收到命令	"!rp=-0.337:74\r\n"
+		sscanf((const char*)buffer,"!rp=%f",&g_nV_psi);
+		printf("[%s%d][%f]\n",__func__,__LINE__,g_nV_psi);
+	}else{
+		;
+	}
+}
+
+/*******************************************************************************
+* Function Name : UART_IO_Frame_Handler 
+* Description   : 处理数据帧（提取完整数据帧，并校正数据）
+* Input         : None
+* Return        : None 
+*******************************************************************************/
+void UART_IO_Frame_Handler(USART_TypeDef* USARTtype,volatile uint8_t buffer[],volatile uint8_t count){
+	printf("[%s%d][%s][%d]\n",__func__,__LINE__,buffer,count);
+	if(strcmp("!rp=",(const char*)buffer)<=0){	//收到命令	"!rp=-0.337:74\r\n"
+		sscanf((const char*)buffer,"!rp=%f",&g_nV_psi);
+		printf("[%s%d][%f]\n",__func__,__LINE__,g_nV_psi);
+	}else{
+		;
+	}
+}
 /*******************************************************************************
 * Function Name : Frame_Handler 
 * Description   : 处理数据帧（提取完整数据帧，并校正数据）
@@ -150,6 +187,8 @@ void Func_Task_100ms01(void){
 
 	// }
 }
+#define RESPONE_OK "OK\n\r"
+
 //100ms回调事件
 void Func_Task_1000ms01(void){
 	static uint8_t flag=0;
@@ -163,8 +202,13 @@ void Func_Task_1000ms01(void){
 	// printf("%s\n", str);
 		flag=0;
 		LED1_On();
-		printf("running...\n");
-		Uart_SendByte(0x04);
+		printf("running...\n");	
+		Uart_SendByteStr(RESPONE_OK,strlen(RESPONE_OK));
+		USART2_SendStr(RP_COMMAND,strlen(RP_COMMAND));
+
+		char sendBuffer[128];
+		sprintf(sendBuffer,"home_page0.t0.txt=\"%f\"\xff\xff\xff",g_nV_psi);
+		USART1_SendStr(sendBuffer,strlen(sendBuffer));
 	}else{
 		flag=1;
 		LED1_Off();
@@ -213,13 +257,15 @@ int main(void){
 	TIM2_Config();
 	
 	USART1_SendByte(0x01);
-	USART2_SendByte(0x02);
-	
+	// USART2_SendByte(0x02);	
+	USART2_SendStr(RP_COMMAND,strlen(RP_COMMAND));
+
 	USART3_SendByte(0x01);		//第一个字节发送异常
 	//USART3_SendByte(0x02);
 	//USART3_SendByte(0x03);
 	USART_GPIO_Init();		//初始化串口GPIO
 	Timer3_Init(9600);			//初始化定时器3
+	Uart_SendByte(0x04);		
 	printf("Init Done\n");
 	// main1();
 	while(1){
@@ -234,13 +280,20 @@ int main(void){
 		if(UART2_ReceiveState==1)
 		{
 			UART2_ReceiveState=0;
-			Frame_Handler(USART2,UART2_RxBuffer,UART2_RxCount);
+			UART2_Frame_Handler(USART2,UART2_RxBuffer,UART2_RxCount);
 			UART2_RxCount=0;
 		}
-		TaskSchedule();
-		if(GetUartIOCounter()>0)	{
-			printf("GetUartIOCounter:%d\n",GetUartIOCounter());
-			printf("Received data: %d\n",Uart_ReceiveByte());
+		//如果UART2接收到1帧数据
+		if(UART_IO_ReceiveState==1)
+		{
+			UART_IO_Frame_Handler(USART2,UART_IO_RxBuffer,UART_IO_RxCount);
+			UART_IO_RxCount=0;
+			UART_IO_ReceiveState=0;
 		}
+		TaskSchedule();
+		// if(GetUartIOCounter()>0)	{
+		// 	printf("GetUartIOCounter:%d\n",GetUartIOCounter());
+		// 	printf("Received data: %d\n",Uart_ReceiveByte());
+		// }
 	}
 }
