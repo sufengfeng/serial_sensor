@@ -123,7 +123,29 @@ void UART2_Frame_Handler(USART_TypeDef* USARTtype,volatile uint8_t buffer[],vola
 		;
 	}
 }
+#define PR_COMMAND_CLS	"*CLS"	//清屏
+#define PR_COMMAND_LOCAL	"LOCAL"	//设置为本地模式
+#define PR_COMMAND_REMOTE	"REMOTE"	//设置为远程模式
+#define PR_COMMAND_AUTOZERO	"AUTOZERO"	//自动校零UTOZERO
+#define PR_COMMAND_RATE	"RATE"	//查询采样率
+#define PR_COMMAND_PR	"PR"	//查询压力值
+#define PR_RESPONE_OK "OK\n\r"	//响应OK
 
+//获取字符串校验和	
+uint8_t Frame_CheckSum_(uint8_t *data,uint8_t len){
+	uint8_t sum=0;
+	while(len--){
+		sum+=*data++;
+	}
+	return sum;
+}
+//滑动窗口滤波	
+float Frame_SlidingWindowFilter(float *data,uint8_t len){
+	float sum=0;
+	for(uint8_t i=0;i<len;i++){
+		sum+=data[i];
+	}
+}
 /*******************************************************************************
 * Function Name : UART_IO_Frame_Handler 
 * Description   : 处理数据帧（提取完整数据帧，并校正数据）
@@ -132,9 +154,19 @@ void UART2_Frame_Handler(USART_TypeDef* USARTtype,volatile uint8_t buffer[],vola
 *******************************************************************************/
 void UART_IO_Frame_Handler(USART_TypeDef* USARTtype,volatile uint8_t buffer[],volatile uint8_t count){
 	printf("[%s%d][%s][%d]\n",__func__,__LINE__,buffer,count);
-	if(strcmp("!rp=",(const char*)buffer)<=0){	//收到命令	"!rp=-0.337:74\r\n"
-		sscanf((const char*)buffer,"!rp=%f",&g_nV_psi);
-		printf("[%s%d][%f]\n",__func__,__LINE__,g_nV_psi);
+	if(strcmp((const char*)buffer,PR_COMMAND_CLS)<=0){	//收到命令	
+		Uart_SendByteStr(PR_RESPONE_OK,strlen(PR_RESPONE_OK));
+	}else  if(strcmp((const char*)buffer,PR_COMMAND_LOCAL)<=0){
+		Uart_SendByteStr(PR_COMMAND_LOCAL,strlen(PR_COMMAND_LOCAL));
+	}
+	else if(strcmp((const char*)buffer,PR_COMMAND_REMOTE)<=0){
+		Uart_SendByteStr(PR_COMMAND_REMOTE,strlen(PR_COMMAND_REMOTE));
+	}else if(strcmp((const char*)buffer,PR_COMMAND_AUTOZERO)<=0){
+		Uart_SendByteStr(PR_COMMAND_AUTOZERO,strlen(PR_COMMAND_AUTOZERO));
+	}else if(strcmp((const char*)buffer,PR_COMMAND_RATE)<=0){
+		Uart_SendByteStr(PR_COMMAND_RATE,strlen(PR_COMMAND_RATE));
+	}else if(strcmp((const char*)buffer,PR_COMMAND_PR)<=0){
+		Uart_SendByteStr(PR_COMMAND_PR,strlen(PR_COMMAND_PR));
 	}else{
 		;
 	}
@@ -187,7 +219,7 @@ void Func_Task_100ms01(void){
 
 	// }
 }
-#define RESPONE_OK "OK\n\r"
+
 
 //100ms回调事件
 void Func_Task_1000ms01(void){
@@ -202,13 +234,19 @@ void Func_Task_1000ms01(void){
 	// printf("%s\n", str);
 		flag=0;
 		LED1_On();
-		printf("running...\n");	
-		Uart_SendByteStr(RESPONE_OK,strlen(RESPONE_OK));
+		// printf("running...\n");	
+		// Uart_SendByteStr(PR_RESPONE_OK,strlen(PR_RESPONE_OK));
 		USART2_SendStr(RP_COMMAND,strlen(RP_COMMAND));
 
 		char sendBuffer[128];
 		sprintf(sendBuffer,"home_page0.t0.txt=\"%f\"\xff\xff\xff",g_nV_psi);
 		USART1_SendStr(sendBuffer,strlen(sendBuffer));
+		
+		sprintf(sendBuffer,"*RP?:");
+		int ret=Frame_CheckSum_(sendBuffer,strlen(sendBuffer));
+		printf("running...[%d]\n",ret);	
+		ret=Frame_CheckSum(sendBuffer,strlen(sendBuffer));
+		printf("running...[%d]\n",ret);	
 	}else{
 		flag=1;
 		LED1_Off();
@@ -264,29 +302,29 @@ int main(void){
 	//USART3_SendByte(0x02);
 	//USART3_SendByte(0x03);
 	USART_GPIO_Init();		//初始化串口GPIO
-	Timer3_Init(9600);			//初始化定时器3
+	Timer3_Init(9600,8);			//初始化定时器3
 	Uart_SendByte(0x04);		
 	printf("Init Done\n");
 	// main1();
 	while(1){
 		//如果UART1接收到1帧数据
-		if(UART1_ReceiveState==1)
+		if(UART1_ReceiveState==1)	//串口屏
 		{
 			UART1_ReceiveState=0;
 			Frame_Handler(USART1,UART1_RxBuffer,UART1_RxCount);
 			UART1_RxCount=0;
 		}
 		//如果UART2接收到1帧数据
-		if(UART2_ReceiveState==1)
+		if(UART2_ReceiveState==1)	//传感器
 		{
 			UART2_ReceiveState=0;
 			UART2_Frame_Handler(USART2,UART2_RxBuffer,UART2_RxCount);
 			UART2_RxCount=0;
 		}
 		//如果UART2接收到1帧数据
-		if(UART_IO_ReceiveState==1)
+		if(UART_IO_ReceiveState==1)	//外部IO
 		{
-			UART_IO_Frame_Handler(USART2,UART_IO_RxBuffer,UART_IO_RxCount);
+			UART_IO_Frame_Handler(NULL,UART_IO_RxBuffer,UART_IO_RxCount);
 			UART_IO_RxCount=0;
 			UART_IO_ReceiveState=0;
 		}

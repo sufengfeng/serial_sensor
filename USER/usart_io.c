@@ -10,28 +10,24 @@
 
 // 发送缓冲区和接收缓冲区
 uint8_t sendBuffer[64];
-// uint8_t receiveBuffer[64];
 uint8_t sendIndex = 0;
-// uint8_t receiveIndex = 0;
 
 // 发送和接收状态标志
 volatile uint8_t sending = 0;
 volatile uint8_t receiving = 0;
 
-// void Timer3_Init(void);
-void Timer3_Init(int BAUD_RATE);
+
+// void Timer3_Init(int BAUD_RATE);
 void USART_GPIO_Init(void);
 void Uart_SendByte(uint8_t data);
 uint8_t Uart_ReceiveByte(void);
 void TIM3_IRQHandler(void);
-// uint8_t GetUartIOCounter(void){
-//     return receiveIndex;
-// }
+
 
 int main1(void)
 {
 	USART_GPIO_Init();
-    Timer3_Init(9600);
+    Timer3_Init(9600,8);
    
 
     // 假设要发送的数据
@@ -59,8 +55,11 @@ int main1(void)
         // }
     }
 }
-void Timer3_Init(int BAUD_RATE)
+int l_nUartWordLength = 8;
+
+void Timer3_Init(int BAUD_RATE,int USART_WordLength)
 {
+    l_nUartWordLength = USART_WordLength;       //设置有效位
     // 开启定时器 3 时钟
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
     TIM_Cmd(TIM3, DISABLE);
@@ -128,22 +127,6 @@ void Uart_SendByte(uint8_t data)
     }
 }
 
-// uint8_t Uart_ReceiveByte(void)
-// {
-//     if (receiveIndex > 0)
-//     {
-//         uint8_t data = receiveBuffer[0];
-//         // 将接收缓冲区中的数据向前移动
-//         for (int i = 0; i < receiveIndex - 1; i++)
-//         {
-//             receiveBuffer[i] = receiveBuffer[i + 1];
-//         }
-//         receiveIndex--;
-//         return data;
-//     }
-//     return 0;
-// }
-
 extern uint8_t UART_IO_RxBuffer[128];
 extern uint8_t UART_IO_RxCount;
 extern uint8_t UART_IO_ReceiveState;
@@ -177,7 +160,7 @@ void TIM3_IRQHandler(void)
                 sendIndex--;
                 bitIndex++;
             }
-            else if (bitIndex <= 8)
+            else if (bitIndex <= l_nUartWordLength)
             {
                 // 发送数据位
                 if (dataToSend & 0x01)
@@ -228,7 +211,7 @@ void TIM3_IRQHandler(void)
                     }
                 }
             }
-            else if (bitIndex > 0 && bitIndex <= 8)
+            else if (bitIndex > 0 && bitIndex <= l_nUartWordLength)
             {
                 // 接收数据位
                 receivedData >>= 1;
@@ -236,7 +219,7 @@ void TIM3_IRQHandler(void)
                     receivedData |= 0x80;
                 bitIndex++;
             }
-            else if (bitIndex == 9)
+            else if (bitIndex == l_nUartWordLength+1)
             {
                 // 检测到停止位
                 // receiveBuffer[receiveIndex++] = receivedData;
