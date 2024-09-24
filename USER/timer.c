@@ -73,11 +73,11 @@ void Flash_Write_Data(uint32_t StartSectorAddress, uint8_t *data, uint16_t num_b
     // 清除所有的Flash标志
     FLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPRTERR);
 
-    // 如果最后一个扇区已满，先擦除
-    if ((StartSectorAddress - FLASH_LAST_SECTOR_ADDRESS) + num_bytes > FLASH_SECTOR_SIZE) {
-        FLASH_ErasePage(FLASH_LAST_SECTOR_ADDRESS);
-    }
-
+    // // 如果最后一个扇区已满，先擦除
+    // if ((StartSectorAddress - FLASH_LAST_SECTOR_ADDRESS) + num_bytes > FLASH_SECTOR_SIZE) {
+    //     FLASH_ErasePage(FLASH_LAST_SECTOR_ADDRESS);
+    // }
+	FLASH_ErasePage(FLASH_LAST_SECTOR_ADDRESS);
     // 以半字为单位进行编程（一个半字是16位）
     for (uint32_t i = 0; i < num_bytes; i += 2) {
         uint16_t data_to_write = data[i] | (data[i+1] << 8);
@@ -101,7 +101,7 @@ void Flash_Write_Read_Example(void) {
 
     // 填充要写入的数据
     for (uint16_t i = 0; i < 128; i++) {
-        write_data[i] = i;
+        write_data[i] = 128-i;
     }
 	printf("Flash Write and Read Example Started\n");
     // 写入数据到最后一个扇区的开始处
@@ -204,8 +204,8 @@ GlobalBasicParam *GetBasicParamHandle(void){
 	return (GlobalBasicParam *)&g_sGlobalBasicParam;
 }
 //从Flash导入基本配置
-int SaveBasicParamTolash(GlobalBasicParam *p_sGlobalBasicParam){
-	Flash_Write_Data(FLASH_LAST_SECTOR_ADDRESS, (uint8_t *)p_sGlobalBasicParam, sizeof(GlobalBasicParam));
+static int SaveBasicParamTolash(GlobalBasicParam *p_sGlobalBasicParam){
+	Flash_Write_Data(FLASH_LAST_SECTOR_ADDRESS, (uint8_t *)p_sGlobalBasicParam, sizeof(GlobalBasicParam)/sizeof(uint8_t));
 	return 0;
 }
 
@@ -252,7 +252,7 @@ int LoadBasicParamFromFlash(GlobalBasicParam *p_sGlobalBasicParam){
 	int  iRet=-1;
 	int8_t retry=3;		//重读次数
 	do{
-		Flash_Read_Data(FLASH_LAST_SECTOR_ADDRESS, (uint8_t *)p_sGlobalBasicParam, sizeof(GlobalBasicParam));
+		Flash_Read_Data(FLASH_LAST_SECTOR_ADDRESS, (uint8_t *)p_sGlobalBasicParam, sizeof(GlobalBasicParam)/sizeof(uint8_t));
 		u16 checksum = CRC32_IBM((uint8_t *)p_sGlobalBasicParam, sizeof(GlobalBasicParam) - 4U);
 		if(checksum!=p_sGlobalBasicParam->checksum){
 			LOG(LOG_ERR,"Load GlobalBasicParam param Error[%d][%d]!",checksum,(unsigned int )p_sGlobalBasicParam->checksum);
@@ -269,5 +269,35 @@ int LoadBasicParamFromFlash(GlobalBasicParam *p_sGlobalBasicParam){
 		LOG(LOG_ERR,"retry too many,so Save GlobalBasicParam Default param!");
 		iRet=SaveBasicParamDefault(p_sGlobalBasicParam);
 	}
+	PrintBasicParam(&g_sGlobalBasicParam);	//打印基本参数
 	return iRet;
+}
+
+
+//单片机硬重启
+void Reboot(void) {
+	__disable_irq();
+	__set_FAULTMASK(1);		//关闭总中断
+	NVIC_SystemReset();		//请求单片机重启
+	while(1){
+		;
+	}
+	return;
+}
+
+//输出功能安全相关参数配置
+void PrintBasicParam(GlobalBasicParam*p_sGlobalBasicParam){
+	int i = 1;
+	LOG(LOG_NOTICE,"Basic Param(%2d) m_nHardVersion 	=0x%08X ", i++, (unsigned int )p_sGlobalBasicParam->m_nHardVersion);
+	LOG(LOG_NOTICE,"Basic Param(%2d) m_nBaudRate 	=%d ", i++, (unsigned int )p_sGlobalBasicParam->m_nBaudRate);
+	LOG(LOG_NOTICE,"Basic Param(%2d) m_nWordLength	=%d ", i++, (unsigned int )p_sGlobalBasicParam->m_nWordLength);
+	LOG(LOG_NOTICE,"Basic Param(%2d) m_nStopBits 	=%d ", i++, (unsigned int )p_sGlobalBasicParam->m_nStopBits);
+	LOG(LOG_NOTICE,"Basic Param(%2d) m_nParity  	=%d ", i++, (unsigned int )p_sGlobalBasicParam->m_nParity);
+	
+
+	// LOG(LOG_NOTICE,"Basic Param(%2d) m_nCanNodeID =%d ", i++, (unsigned int )p_sGlobalBasicParam->m_nCanNodeID);
+	// LOG(LOG_NOTICE,"Basic Param(%2d) m_nCanBaudRate =%d ", i++, (unsigned int )p_sGlobalBasicParam->m_nCanBaudRate);
+//	LOG(LOG_NOTICE,"Basic Param(%2d) m_nManual =%d ", i++, (unsigned int )p_sGlobalBasicParam->m_nManual);
+
+	return ;
 }

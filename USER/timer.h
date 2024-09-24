@@ -24,7 +24,7 @@ typedef struct __GlobalBasicParam
     uint8_t m_nLogLevel;   // 7:日志等级
     uint16_t reverse02;  // 8:保留字段
 
-    uint32_t reserved[32 - 5]; // 12:保留字段, 127-前面字段
+    uint32_t reserved[16 - 5]; // 12:保留字段, 127-前面字段
     uint32_t checksum;         // 13:配置文件校验
 } GlobalBasicParam, *p_GlobalBasicParam;
 
@@ -36,5 +36,8 @@ typedef enum
     enumEven,    //偶校验
 }enumParity;
 #define CONFIG_SYMBOL_BASE 		("BAS")			//基本配置参数头校验
-
+void PrintBasicParam(GlobalBasicParam*p_sGlobalBasicParam);
+void Reboot(void) ;
+int LoadBasicParamFromFlash(GlobalBasicParam *p_sGlobalBasicParam);
+int  SaveCurrentBasicParam(void);
 #endif

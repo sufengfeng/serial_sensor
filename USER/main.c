@@ -4,6 +4,7 @@
 #include "uart.h"
 #include "fifo.h"
 #include "stdio.h"
+#include "timer.h"
 volatile uint8_t UART1_RxBuffer[128] = {0x00};
 volatile uint8_t UART1_RxCount = 0;
 volatile uint8_t UART1_ReceiveState = 0;
@@ -247,9 +248,29 @@ void UART1_Frame_Handler(USART_TypeDef *USARTtype, volatile uint8_t buffer[], vo
 	{ 
 		SendComandAutoZero();
 		printf("[%s][%d]SendComandAutoZero\n",	__func__, __LINE__);
-	}	else 
+	}	else if(!strncmp((const char *)buffer, "BaudRate=", strlen("BaudRate=")))	//BaudRate=9600;WordLength=8;StopBits=1;Parity=None
 	{
-		;
+		GlobalBasicParam*p_sGlobalBasicParam=(void *)GetBasicParamHandle();
+		char tmpBuffer[128];
+		sscanf((const char *)buffer, "BaudRate=%d;WordLength=%d;StopBits=%d;Parity=%s", &(p_sGlobalBasicParam->m_nBaudRate),&(p_sGlobalBasicParam->m_nWordLength),&(p_sGlobalBasicParam->m_nStopBits),tmpBuffer);
+		if (!strncmp((const char *)buffer,"None",strlen("None")))
+		{
+			p_sGlobalBasicParam->m_nParity=enumNone;
+		}else if (	!strncmp((const char *)buffer, "Odd", strlen("Odd")))
+		{
+			p_sGlobalBasicParam->m_nParity=enumOdd;
+		}else{	
+			p_sGlobalBasicParam->m_nParity=enumEven;
+		}
+		PrintBasicParam(p_sGlobalBasicParam);
+	}	else if(!strncmp((const char *)buffer, "SaveSerialParam", strlen("SaveSerialParam")))	//"SaveSerialParam"	保存串口参数		
+	{
+	    printf("[%s][%d]SaveSerialParam\n",	__func__, __LINE__);
+		SaveCurrentBasicParam();
+		Reboot();
+	}else if(!strncmp((const char *)buffer, "page_setting", strlen("page_setting")))	//"SaveSerialParam"	保存串口参数		
+	{
+	    UpdateUiInit();	//
 	}
 }
 // 1ms回调事件
@@ -270,7 +291,7 @@ int SendComandAutoZero(void)
 	return USART2_SendStr(SENSOR_COMMAND_AZ, strlen(SENSOR_COMMAND_AZ)); // 发送查询命令
 }
 // 周期更新数据到串口屏
-int UpdateUi(void)
+int UpdateUiPeriod(void)
 {
 	static float last_V_psi = 0;
 	last_V_psi = g_fV_psi;
@@ -281,6 +302,34 @@ int UpdateUi(void)
 
 	g_fV_rate = g_fV_psi - last_V_psi;
 	sprintf(sendBuffer, "home_page0.t3.txt=\"%f\"\xff\xff\xff", g_fV_rate);
+	USART1_SendStr(sendBuffer, strlen(sendBuffer));
+}
+// 周期更新数据到串口屏
+int UpdateUiInit(void)
+{
+	char sendBuffer[128];
+	char tmpBuffer[128];
+	GlobalBasicParam*p_sGlobalBasicParam=(void *)GetBasicParamHandle();
+	sprintf(sendBuffer, "setting.cb0.txt=\"%d\"\xff\xff\xff", p_sGlobalBasicParam->m_nBaudRate);	// 波特率
+	USART1_SendStr(sendBuffer, strlen(sendBuffer));
+
+	sprintf(sendBuffer, "setting.cb1.txt=\"%d\"\xff\xff\xff", p_sGlobalBasicParam->m_nWordLength);	// 数据位
+	USART1_SendStr(sendBuffer, strlen(sendBuffer));
+
+	sprintf(sendBuffer, "setting.cb2.txt=\"%d\"\xff\xff\xff", p_sGlobalBasicParam->m_nStopBits);	// 停止位
+	USART1_SendStr(sendBuffer, strlen(sendBuffer));
+	
+	if(p_sGlobalBasicParam->m_nParity ==enumNone){
+		sprintf(tmpBuffer, "None");
+	}else if (	p_sGlobalBasicParam->m_nParity==enumOdd) 
+	{
+		sprintf(tmpBuffer, "Odd");
+	}else
+	{
+		sprintf(tmpBuffer, "Even");
+	}
+	
+	sprintf(sendBuffer, "setting.cb3.txt=\"%s\"\xff\xff\xff", tmpBuffer);	// 奇偶校验
 	USART1_SendStr(sendBuffer, strlen(sendBuffer));
 }
 // 100ms回调事件
@@ -299,7 +348,7 @@ void Func_Task_1000ms01(void)
 	}
 
 	// 周期更新数据到串口屏
-	UpdateUi();
+	UpdateUiPeriod();
 
 	// printf("[%s%d][%fmbar]\n", __func__, __LINE__, g_fV_mbar);
 	// sprintf(sendBuffer, "*RP?:");
@@ -376,12 +425,17 @@ int main(void)
 	USART3_SendByte(0x01); // 第一个字节发送异常
 	// USART3_SendByte(0x02);
 	// USART3_SendByte(0x03);
+	
+	LoadBasicParamFromFlash(GetBasicParamHandle()); // 从Flash中读取基本参数
+	UpdateUiInit(); // 初始化串口屏UI
+
 	USART_GPIO_Init();	  // 初始化串口GPIO
-	Timer3_Init(9600, 8); // 初始化定时器3
+	GlobalBasicParam*p_sGlobalBasicParam=(void *)GetBasicParamHandle();
+	Timer3_Init(p_sGlobalBasicParam->m_nBaudRate, p_sGlobalBasicParam->m_nWordLength	); // 初始化定时器3
 	Uart_SendByte(0x04);
 	printf("Init Done\n");
-	extern void Flash_Write_Read_Example(void) ;
-	//Flash_Write_Read_Example();
+	// extern void Flash_Write_Read_Example(void) ;
+	// Flash_Write_Read_Example();
 	// main1();
 	while (1)
 	{

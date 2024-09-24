@@ -42,8 +42,7 @@ void USART_SendByte(USART_TypeDef* USARTx,uint16_t Data);
 #endif
 
 
-#define LOG_LEVLE  (LOG_INFO)
-
+#define LOG_LEVLE  (GetLogLevel())
 
 #define log_ printf
 #define LOG(flag, fmt, args...)\
