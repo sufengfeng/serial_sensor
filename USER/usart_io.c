@@ -61,6 +61,12 @@ static int l_nUartWordLength = 8;
 
 void Timer3_Init(int BAUD_RATE,int USART_WordLength)
 {
+    if(BAUD_RATE<4800||BAUD_RATE>115200){
+       BAUD_RATE=9600; 
+    }
+    if(USART_WordLength<7||USART_WordLength>9){
+       USART_WordLength=8; 
+    }
     l_nUartWordLength = USART_WordLength;       //设置有效位
     // 开启定时器 3 时钟
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);

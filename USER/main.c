@@ -131,7 +131,46 @@ float sliding_window_filter(float current_value)
 	return sum / count;
 }
 
-uint8_t PR4_COMMAND_PRESSURE[] = "PR";
+float sliding_window_filter_max_min(float current_value)
+{
+	static float history_data[WINDOW_SIZE];
+	static int index = 0;
+	static int count = 0;
+
+	history_data[index++] = current_value;
+	if (index >= WINDOW_SIZE)
+	{
+		index = 0;
+	}
+	if (count < WINDOW_SIZE)
+	{
+		count++;
+	}
+
+	float sum = 0;
+	float max_val = current_value; // 初始化为最小浮点数
+	float min_val = current_value; // 初始化为最大浮点数
+
+	for (int i = 0; i < count; i++)
+	{
+		if (history_data[i] > max_val)
+		{
+			max_val = history_data[i];
+		}
+		if (history_data[i] < min_val)
+		{
+			min_val = history_data[i];
+		}
+		sum += history_data[i];
+	}
+
+	// 减去最大值和最小值
+	sum -= (max_val + min_val);
+
+	// 计算平均值，分母为窗口大小减去2
+	return sum / (count - 2);
+}
+
 uint8_t PACE_COMMAND_PRESSURE[] = {0x3A, 0x53, 0x65, 0x6E, 0x73, 0x3F, 0x0D, 0x0A};
 uint8_t PACE_RESULT_HEAD[] = ":SEHS:PRES";
 
@@ -140,8 +179,12 @@ uint8_t PACE_RESULT_HEAD[] = ":SEHS:PRES";
 // [Func_Task_1000ms01303][*RP?:][25]
 // [Func_Task_1000ms01306][*IZ:][63]
 float g_fV_mbar = 0;
-float g_fV_psi = 0;	 // psi压力值
-float g_fV_rate = 0; // psi压力值变化率
+float g_fV_psi = 0;				 // psi压力值
+float g_fV_rate = 0;			 // psi压力值变化率
+float g_fV_rateMax = 0.00145;	 // psi压力值变化率最大值
+uint8_t g_bIsAutoZero = 0;		 // 自动校零标志位
+uint8_t g_bIsAutoZeroReason = 0; // 自动校零原因	0：无，bit1：命令行，bit2：界面
+uint8_t g_bFlageStatus = 0;		 // 远程模式标志位
 
 /*******************************************************************************
  * Function Name : UART2_Frame_Handler
@@ -157,6 +200,7 @@ void UART2_Frame_Handler(USART_TypeDef *USARTtype, volatile uint8_t buffer[], vo
 		float tmpValue = 0;
 		sscanf((const char *)buffer, "!rp=%f", &tmpValue);
 		g_fV_mbar = sliding_window_filter(tmpValue);
+		// g_fV_mbar = sliding_window_filter_max_min(tmpValue);
 		// printf("[%s%d][%f]\n", __func__, __LINE__, g_fV_mbar);
 	}
 }
@@ -164,10 +208,20 @@ void UART2_Frame_Handler(USART_TypeDef *USARTtype, volatile uint8_t buffer[], vo
 #define PR_COMMAND_CLS "*CLS\r\n"			   // 清屏
 #define PR_COMMAND_LOCAL "LOCAL\r\n"		   // 设置为本地模式
 #define PR_COMMAND_REMOTE "REMOTE\r\n"		   // 设置为远程模式
+#define PR_COMMAND_CONF1 "CONF1"			   // 设置为本地模式
 #define PR_COMMAND_COM_PARAMETER "COM1 "	   // 设置串口参数
 #define PR_COMMAND_AUTOZERO "AUTOZERO=RUN\r\n" // 自动校零UTOZERO
 #define PR_COMMAND_RATE "RATE\r\n"			   // 查询采样率
 #define PR_COMMAND_PR "PR\r\n"				   // 查询压力值
+#define PR_COMMAND_PR_ "PR?\r\n"			   // 查询压力值
+
+#define PR_COMMAND_pr "pr\r\n"	 // 查询压力值
+#define PR_COMMAND_pr_ "pr?\r\n" // 查询压力值
+
+#define PR_COMMAND_READ "READ?\r\n"			  // 查询压力值
+#define PR_COMMAND_READ1 "READ1?\r\n"		  // 查询压力值
+#define COMAND_COM1_SET "COM1 2400,E,7,1\r\n" // 设置串口参数
+#define COMAND_COM1_SET_RES "2400,E,7,1\r\n"
 
 #define PR_RESPONE_OK "OK\r\n" // 响应OK
 
@@ -180,6 +234,31 @@ uint8_t Frame_CheckSum_(uint8_t *data, uint8_t len)
 		sum += *data++;
 	}
 	return sum % 100;
+}
+#include "math.h"
+
+void ReponceComandPR(void)
+{
+	char sendBuffer[128];
+	memset(sendBuffer, 0, 128);
+	float bmpValue = fabs(g_fV_rate);
+	if (bmpValue > g_fV_rateMax)
+	{
+		sprintf(sendBuffer, "NR      %.3f psi g\r\n", g_fV_psi);
+		Uart_SendByteStr(sendBuffer, strlen(sendBuffer));
+	}
+	else
+	{
+		sprintf(sendBuffer, "R       %.3f psi g\r\n", g_fV_psi);
+		Uart_SendByteStr(sendBuffer, strlen(sendBuffer));
+	}
+}
+void ReponceComandREAD(void)
+{
+	char sendBuffer[128];
+	memset(sendBuffer, 0, 128);
+	sprintf(sendBuffer, "%.3f\r\n", g_fV_psi);
+	Uart_SendByteStr(sendBuffer, strlen(sendBuffer));
 }
 
 /*******************************************************************************
@@ -201,33 +280,61 @@ void UART_IO_Frame_Handler(USART_TypeDef *USARTtype, volatile uint8_t buffer[], 
 	}
 	else if (!strncmp((const char *)buffer, PR_COMMAND_REMOTE, strlen(PR_COMMAND_REMOTE))) // 设置为远程模式
 	{
+		if (g_bFlageStatus)
+		{ // 初始化
+			g_bFlageStatus = 0;
+		}
+		else
+		{
+			g_bFlageStatus = 1;
+		}
 		Uart_SendByteStr(buffer, len);
 	}
 	else if (!strncmp((const char *)buffer, PR_COMMAND_AUTOZERO, strlen(PR_COMMAND_AUTOZERO))) // 自动校零
 	{
-		SendComandAutoZero();
+
+		g_bIsAutoZero = 1;
+		g_bIsAutoZeroReason = g_bIsAutoZeroReason | 0x20;
+	}
+	else if (!strncmp((const char *)buffer, PR_COMMAND_CONF1, strlen(PR_COMMAND_CONF1))) // 自动校零
+	{
 		Uart_SendByteStr(PR_RESPONE_OK, strlen(PR_RESPONE_OK));
 	}
 	else if (!strncmp((const char *)buffer, PR_COMMAND_RATE, strlen(PR_COMMAND_RATE))) // 查询采样率
 	{
 		char sendBuffer[128];
+		memset(sendBuffer, 0, 128);
 		sprintf(sendBuffer, "%f psi/s\r\n", g_fV_rate);
-		Uart_SendByteStr(buffer, len);
+		Uart_SendByteStr(sendBuffer, strlen(sendBuffer));
 	}
 	else if (!strncmp((const char *)buffer, PR_COMMAND_PR, strlen(PR_COMMAND_PR)))
 	{
-		char sendBuffer[128];
-		if (abs(g_fV_psi) > 0.00145)
-		{
-			sprintf(sendBuffer, "NR      %.3f psi g\r\n", g_fV_psi);
-			Uart_SendByteStr(sendBuffer, strlen(sendBuffer));
-		}
-		else
-		{
-			sprintf(sendBuffer, "R       %.3f psi g\r\n", g_fV_psi);
-			Uart_SendByteStr(sendBuffer, strlen(sendBuffer));
-		}
-		Uart_SendByteStr(buffer, len);
+		ReponceComandPR();
+	}
+	else if (!strncmp((const char *)buffer, PR_COMMAND_PR_, strlen(PR_COMMAND_PR_)))
+	{
+		ReponceComandPR();
+	}
+	else if (!strncmp((const char *)buffer, PR_COMMAND_pr, strlen(PR_COMMAND_pr)))
+	{
+		ReponceComandPR();
+	}
+	else if (!strncmp((const char *)buffer, PR_COMMAND_pr_, strlen(PR_COMMAND_pr_)))
+	{
+		ReponceComandPR();
+	}
+
+	else if (!strncmp((const char *)buffer, PR_COMMAND_READ, strlen(PR_COMMAND_READ)))
+	{
+		ReponceComandPR();
+	}
+	else if (!strncmp((const char *)buffer, PR_COMMAND_READ1, strlen(PR_COMMAND_READ1)))
+	{
+		ReponceComandREAD();
+	}
+	else if (!strncmp((const char *)buffer, COMAND_COM1_SET, strlen(COMAND_COM1_SET)))
+	{
+		Uart_SendByteStr(COMAND_COM1_SET_RES, strlen(COMAND_COM1_SET_RES));
 	}
 	else
 	{
@@ -244,35 +351,142 @@ void UART_IO_Frame_Handler(USART_TypeDef *USARTtype, volatile uint8_t buffer[], 
 void UART1_Frame_Handler(USART_TypeDef *USARTtype, volatile uint8_t buffer[], volatile uint8_t len)
 {
 	printf("[%s%d][%s][%d]\n", __func__, __LINE__, buffer, len);
-	if (!strncmp((const char *)buffer,UI_COMMAND_AZ,strlen(UI_COMMAND_AZ)))	// 收到命令	
-	{ 
-		SendComandAutoZero();
-		printf("[%s][%d]SendComandAutoZero\n",	__func__, __LINE__);
-	}	else if(!strncmp((const char *)buffer, "BaudRate=", strlen("BaudRate=")))	//BaudRate=9600;WordLength=8;StopBits=1;Parity=None
+	if (!strncmp((const char *)buffer, UI_COMMAND_AZ, strlen(UI_COMMAND_AZ))) // 收到命令
 	{
-		GlobalBasicParam*p_sGlobalBasicParam=(void *)GetBasicParamHandle();
+		g_bIsAutoZero = 1;
+		g_bIsAutoZeroReason = g_bIsAutoZeroReason | 0x01;
+	}
+	else if (!strncmp((const char *)buffer, "BaudRate=", strlen("BaudRate="))) // BaudRate=9600;WordLength=8;StopBits=1;Parity=None
+	{
+		GlobalBasicParam *p_sGlobalBasicParam = (void *)GetBasicParamHandle();
 		char tmpBuffer[128];
-		sscanf((const char *)buffer, "BaudRate=%d;WordLength=%d;StopBits=%d;Parity=%s", &(p_sGlobalBasicParam->m_nBaudRate),&(p_sGlobalBasicParam->m_nWordLength),&(p_sGlobalBasicParam->m_nStopBits),tmpBuffer);
-		if (!strncmp((const char *)buffer,"None",strlen("None")))
+		sscanf((const char *)buffer, "BaudRate=%d;WordLength=%d;StopBits=%d;Parity=%s", &(p_sGlobalBasicParam->m_nBaudRate), &(p_sGlobalBasicParam->m_nWordLength), &(p_sGlobalBasicParam->m_nStopBits), tmpBuffer);
+		if (!strncmp((const char *)tmpBuffer, "None", strlen("None")))
 		{
-			p_sGlobalBasicParam->m_nParity=enumNone;
-		}else if (	!strncmp((const char *)buffer, "Odd", strlen("Odd")))
+			p_sGlobalBasicParam->m_nParity = enumNone;
+		}
+		else if (!strncmp((const char *)tmpBuffer, "Odd", strlen("Odd")))
 		{
-			p_sGlobalBasicParam->m_nParity=enumOdd;
-		}else{	
-			p_sGlobalBasicParam->m_nParity=enumEven;
+			p_sGlobalBasicParam->m_nParity = enumOdd;
+		}
+		else
+		{
+			p_sGlobalBasicParam->m_nParity = enumEven;
 		}
 		PrintBasicParam(p_sGlobalBasicParam);
-	}	else if(!strncmp((const char *)buffer, "SaveSerialParam", strlen("SaveSerialParam")))	//"SaveSerialParam"	保存串口参数		
+	}
+	else if (!strncmp((const char *)buffer, "SaveSerialParam", strlen("SaveSerialParam"))) //"SaveSerialParam"	保存串口参数
 	{
-	    printf("[%s][%d]SaveSerialParam\n",	__func__, __LINE__);
+		printf("[%s][%d]SaveSerialParam\n", __func__, __LINE__);
 		SaveCurrentBasicParam();
 		Reboot();
-	}else if(!strncmp((const char *)buffer, "page_setting", strlen("page_setting")))	//"SaveSerialParam"	保存串口参数		
+	}
+	else if (!strncmp((const char *)buffer, "page_setting", strlen("page_setting"))) //"SaveSerialParam"	保存串口参数
 	{
-	    UpdateUiInit();	//
+		UpdateUiInit(); //
 	}
 }
+void ControlRemoteStatue(void) // 控制自动校零
+{
+	if (g_bFlageStatus)
+	{
+		OpenRemoteLed();
+	}
+	else
+	{
+		CloseRemoteLed();
+	}
+}
+void Show_OverPress(void){
+
+}
+#define MAX_MPA_PROTECT (2100)
+void ControlAutoZero(void) // 控制自动校零
+{
+	static uint8_t stepZero = 0;
+	if (g_bIsAutoZero == 1) // 如果当前在自动校零	状态	则开始自动校零	状态	，否则不处理
+	{
+		switch (stepZero)
+		{
+		case 0:
+		{
+			printf("[%s][%d]Begin AutoZero ...\n", __func__, __LINE__);
+			OpenValve(); // 打开校零阀
+			stepZero = 1;
+		}
+		break;
+		case 1:
+		{
+			static int counter = 0;
+			if (counter++ >= 6)
+			{ // 等待600ms
+				counter = 0;
+				stepZero = 2;
+			}
+		}
+		break;
+		case 2:
+		{
+			SendComandAutoZero(); // 发送校零命令
+			stepZero = 3;
+			break;
+		}
+		case 3:
+		{
+			static int counter = 0;
+			if (counter++ >= 4)
+			{ // 等待400ms
+				counter = 0;
+				stepZero = 4;
+			}
+		}
+		break;
+		case 4:
+		{
+			CloseValve();
+			stepZero = 0;
+			g_bIsAutoZero = 0;
+			if (g_bIsAutoZeroReason & 0x01) // 界面
+			{
+				printf("[%s][%d]AutoZero show Done!!\n", __func__, __LINE__);
+			}
+			else if (g_bIsAutoZeroReason & 0x02)
+			{
+				Uart_SendByteStr(PR_RESPONE_OK, strlen(PR_RESPONE_OK)); // 发送校零命令响应
+				printf("[%s][%d]AutoZero command Done!!\n", __func__, __LINE__);
+			}
+			else
+			{
+				printf("[%s][%d]AutoZero Done!!\n", __func__, __LINE__);
+			}
+			g_bIsAutoZeroReason = 0;
+		}
+		break;
+		default:
+		{
+			stepZero = 0;
+			g_bIsAutoZero = 0;
+			g_bIsAutoZeroReason = 0;
+		}
+
+		break;
+		}
+	}
+	if(g_fV_mbar>MAX_MPA_PROTECT){
+		Show_OverPress();
+		CloseValve();
+	}
+}
+void ControlShowLed(void ){
+	if (g_fV_rate >= g_fV_rateMax)
+	{
+		ShowRedLed();
+	}
+	else
+	{
+		ShowGreenLed();
+	}
+} 
 // 1ms回调事件
 void Func_Task_1ms01(void)
 {
@@ -285,6 +499,8 @@ void Func_Task_10ms01(void)
 void Func_Task_100ms01(void)
 {
 	USART2_SendStr(SENSOR_COMMAND_RP, strlen(SENSOR_COMMAND_RP)); // 发送查询命令
+	
+	ControlAutoZero();	// 控制自动校零
 }
 int SendComandAutoZero(void)
 {
@@ -296,12 +512,27 @@ int UpdateUiPeriod(void)
 	static float last_V_psi = 0;
 	last_V_psi = g_fV_psi;
 	char sendBuffer[128];
-	g_fV_psi = 0.0145038 * g_fV_mbar;
-	sprintf(sendBuffer, "home_page0.t0.txt=\"%f\"\xff\xff\xff", g_fV_psi);
+	g_fV_psi = 0.0145037744 * g_fV_mbar;
+	if (g_fV_psi >= 0)
+	{
+		sprintf(sendBuffer, "home_page0.t0.txt=\" %.5f\"\xff\xff\xff", g_fV_psi);
+	}
+	else
+	{
+		sprintf(sendBuffer, "home_page0.t0.txt=\"%.5f\"\xff\xff\xff", g_fV_psi);
+	}
+
 	USART1_SendStr(sendBuffer, strlen(sendBuffer));
 
 	g_fV_rate = g_fV_psi - last_V_psi;
-	sprintf(sendBuffer, "home_page0.t3.txt=\"%f\"\xff\xff\xff", g_fV_rate);
+	if (g_fV_rate >= 0)
+	{
+		sprintf(sendBuffer, "home_page0.t3.txt=\" %.5f\"\xff\xff\xff", g_fV_rate);
+	}
+	else
+	{
+		sprintf(sendBuffer, "home_page0.t3.txt=\"%.5f\"\xff\xff\xff", g_fV_rate);
+	}
 	USART1_SendStr(sendBuffer, strlen(sendBuffer));
 }
 // 周期更新数据到串口屏
@@ -309,27 +540,34 @@ int UpdateUiInit(void)
 {
 	char sendBuffer[128];
 	char tmpBuffer[128];
-	GlobalBasicParam*p_sGlobalBasicParam=(void *)GetBasicParamHandle();
-	sprintf(sendBuffer, "setting.cb0.txt=\"%d\"\xff\xff\xff", p_sGlobalBasicParam->m_nBaudRate);	// 波特率
+	memset(sendBuffer, 0, 128);
+	GlobalBasicParam *p_sGlobalBasicParam = (void *)GetBasicParamHandle();
+	// sprintf(sendBuffer, "setting.cb0.txt=\"%d\" \xff\xff\xff", p_sGlobalBasicParam->m_nBaudRate);	// 波特率
+	sprintf(sendBuffer, "setting.cb0.txt=\" %d\"\xff\xff\xff", p_sGlobalBasicParam->m_nBaudRate);
 	USART1_SendStr(sendBuffer, strlen(sendBuffer));
 
-	sprintf(sendBuffer, "setting.cb1.txt=\"%d\"\xff\xff\xff", p_sGlobalBasicParam->m_nWordLength);	// 数据位
+	memset(sendBuffer, 0, 128);
+	sprintf(sendBuffer, "setting.cb1.txt=\"%d\"\xff\xff\xff", p_sGlobalBasicParam->m_nWordLength); // 数据位
 	USART1_SendStr(sendBuffer, strlen(sendBuffer));
 
-	sprintf(sendBuffer, "setting.cb2.txt=\"%d\"\xff\xff\xff", p_sGlobalBasicParam->m_nStopBits);	// 停止位
+	memset(sendBuffer, 0, 128);
+	sprintf(sendBuffer, "setting.cb2.txt=\"%d\"\xff\xff\xff", p_sGlobalBasicParam->m_nStopBits); // 停止位
 	USART1_SendStr(sendBuffer, strlen(sendBuffer));
-	
-	if(p_sGlobalBasicParam->m_nParity ==enumNone){
+
+	if (p_sGlobalBasicParam->m_nParity == enumNone)
+	{
 		sprintf(tmpBuffer, "None");
-	}else if (	p_sGlobalBasicParam->m_nParity==enumOdd) 
+	}
+	else if (p_sGlobalBasicParam->m_nParity == enumOdd)
 	{
 		sprintf(tmpBuffer, "Odd");
-	}else
+	}
+	else
 	{
 		sprintf(tmpBuffer, "Even");
 	}
-	
-	sprintf(sendBuffer, "setting.cb3.txt=\"%s\"\xff\xff\xff", tmpBuffer);	// 奇偶校验
+	memset(sendBuffer, 0, 128);
+	sprintf(sendBuffer, "setting.cb3.txt=\"%s\"\xff\xff\xff", tmpBuffer); // 奇偶校验
 	USART1_SendStr(sendBuffer, strlen(sendBuffer));
 }
 // 100ms回调事件
@@ -339,17 +577,18 @@ void Func_Task_1000ms01(void)
 	if (flag)
 	{
 		flag = 0;
-		LED1_On();
+		BoardLED1_On();
 	}
 	else
 	{
 		flag = 1;
-		LED1_Off();
+		BoardLED1_Off();
 	}
 
-	// 周期更新数据到串口屏
-	UpdateUiPeriod();
-
+	
+	UpdateUiPeriod();	// 周期更新数据到串口屏
+	ControlShowLed(); // 控制气体是否稳定显示灯
+	ControlRemoteStatue();	// 远程控制状态显示
 	// printf("[%s%d][%fmbar]\n", __func__, __LINE__, g_fV_mbar);
 	// sprintf(sendBuffer, "*RP?:");
 	// int ret = Frame_CheckSum_(sendBuffer, strlen(sendBuffer));
@@ -361,17 +600,17 @@ void Func_Task_1000ms01(void)
 // 1ms中断事件
 void Func_Task_Interrupt(void)
 {
-	static int flag = 1;
-	if (flag)
-	{
-		flag = 0;
-		GPIO_SetBits(GPIOA, GPIO_Pin_5); // PA5
-	}
-	else
-	{
-		flag = 1;
-		GPIO_ResetBits(GPIOA, GPIO_Pin_5); // PA5
-	}
+	// static int flag = 1;
+	// if (flag)
+	// {
+	// 	flag = 0;
+	// 	GPIO_SetBits(GPIOA, GPIO_Pin_5); // PA5
+	// }
+	// else
+	// {
+	// 	flag = 1;
+	// 	GPIO_ResetBits(GPIOA, GPIO_Pin_5); // PA5
+	// }
 }
 /*****************************callback end***************************************************/
 // 多任务软定时器		异步任务
@@ -411,8 +650,9 @@ int main(void)
 	uint8_t byte;
 	RCC_Config();
 	NVIC_Config();
-	LED1_Config();
-	LED1_On();
+	BoardLED1_Config();
+	BoardLED1_On();
+	ShowLedConfig();
 	USART1_Config();
 	USART2_Config();
 	USART3_Config();
@@ -423,17 +663,20 @@ int main(void)
 	USART2_SendStr(SENSOR_COMMAND_RP, strlen(SENSOR_COMMAND_RP));
 
 	USART3_SendByte(0x01); // 第一个字节发送异常
+
 	// USART3_SendByte(0x02);
 	// USART3_SendByte(0x03);
-	
-	LoadBasicParamFromFlash(GetBasicParamHandle()); // 从Flash中读取基本参数
-	UpdateUiInit(); // 初始化串口屏UI
 
-	USART_GPIO_Init();	  // 初始化串口GPIO
-	GlobalBasicParam*p_sGlobalBasicParam=(void *)GetBasicParamHandle();
-	Timer3_Init(p_sGlobalBasicParam->m_nBaudRate, p_sGlobalBasicParam->m_nWordLength	); // 初始化定时器3
+	LoadBasicParamFromFlash(GetBasicParamHandle()); // 从Flash中读取基本参数
+	UpdateUiInit();									// 初始化串口屏UI
+
+	USART_GPIO_Init(); // 初始化串口GPIO
+	GlobalBasicParam *p_sGlobalBasicParam = (void *)GetBasicParamHandle();
+	Timer3_Init(p_sGlobalBasicParam->m_nBaudRate, p_sGlobalBasicParam->m_nWordLength); // 初始化定时器3
+	// Timer3_Init(9600, 8); // 初始化定时器3
 	Uart_SendByte(0x04);
 	printf("Init Done\n");
+	LOG(LOG_CRIT, "\n\rCopyright (c) 2021,Geekplus All rights reserved.\n\rRelease SafePLC version=[0x%08lx] %s-%s\r\n", p_sGlobalBasicParam->m_nAppVersion, __DATE__, __TIME__);
 	// extern void Flash_Write_Read_Example(void) ;
 	// Flash_Write_Read_Example();
 	// main1();

@@ -16,15 +16,15 @@ typedef struct __GlobalBasicParam
     uint8_t m_sSYMBOL[4];    // 1:"CONFIG_SYMBOL_BASE"字节头
     uint32_t m_nHardVersion; // 2:硬件版本 0xA200/0xA300
 
-    uint16_t m_nBaudRate;    // 3:波特率
+    uint32_t m_nBaudRate;    // 3:波特率
     uint8_t m_nWordLength;   // 4:数据位
     uint8_t m_nStopBits;     // 5:停止位
 
     uint8_t m_nParity;    // 6:校验位
     uint8_t m_nLogLevel;   // 7:日志等级
     uint16_t reverse02;  // 8:保留字段
-
-    uint32_t reserved[16 - 5]; // 12:保留字段, 127-前面字段
+    uint32_t m_nAppVersion; // 2:硬件版本 0xA200/0xA300
+    uint32_t reserved[16 - 6]; // 12:保留字段, 127-前面字段
     uint32_t checksum;         // 13:配置文件校验
 } GlobalBasicParam, *p_GlobalBasicParam;
 

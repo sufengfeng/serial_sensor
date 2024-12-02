@@ -6,7 +6,7 @@
 * Description   : LED1¿ªÆô
 * Return        : None 
 *******************************************************************************/
-void LED1_Config(void){
+void BoardLED1_Config(void){
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB,ENABLE);
 	GPIO_InitTypeDef gpioInit;
 	gpioInit.GPIO_Mode=GPIO_Mode_Out_PP;
@@ -31,12 +31,40 @@ void LED1_Config(void){
 	GPIO_Init(GPIOA,&gpioInit);
 }
 
+void ShowLedConfig(void){
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA,ENABLE);
+	GPIO_InitTypeDef gpioInit;
+	gpioInit.GPIO_Mode=GPIO_Mode_Out_PP;
+	gpioInit.GPIO_Pin=GPIO_Pin_4|GPIO_Pin_5|GPIO_Pin_6|GPIO_Pin_7;
+	gpioInit.GPIO_Speed=GPIO_Speed_2MHz;
+	GPIO_Init(GPIOA,&gpioInit);
+}
+void ShowRedLed(void){
+	GPIO_ResetBits(GPIOA,GPIO_Pin_5);
+	GPIO_SetBits(GPIOA,GPIO_Pin_6);
+}
+void ShowGreenLed(void){
+	GPIO_SetBits(GPIOA,GPIO_Pin_5);
+	GPIO_ResetBits(GPIOA,GPIO_Pin_6);
+}
+void OpenRemoteLed(void){
+    GPIO_ResetBits(GPIOA,GPIO_Pin_4);
+}	
+void CloseRemoteLed(void){
+    GPIO_SetBits(GPIOA,GPIO_Pin_4);
+}
+void OpenValve(void){
+	GPIO_ResetBits(GPIOA,GPIO_Pin_7);
+}
+void CloseValve(void){
+	GPIO_SetBits(GPIOA,GPIO_Pin_7);
+}
 /*******************************************************************************
 * Function Name : LED1_On
 * Description   : LED1¿ªÆô
 * Return        : None 
 *******************************************************************************/
-void LED1_On(void){
+void BoardLED1_On(void){
 	GPIO_SetBits(GPIOB,GPIO_Pin_1);
 }
 
@@ -46,6 +74,6 @@ void LED1_On(void){
 * Return        : None 
 *******************************************************************************/
 //LED1¹Ø±Õ
-void LED1_Off(void){
+void BoardLED1_Off(void){
 	GPIO_ResetBits(GPIOB,GPIO_Pin_1);
 }
