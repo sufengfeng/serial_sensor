@@ -2,15 +2,15 @@
 #include "stm32f10x.h"
 #include "stm32f10x.h"
 #include "stm32f10x_usart.h"
-
+#include "uart.h"
 // 定义一些常量
 // #define BAUD_RATE 9600
-#define TIMER_PRESCALER 72
+#define TIMER_PRESCALER 1
 // #define TIMER_PERIOD ((72000000 / TIMER_PRESCALER) / BAUD_RATE)
 
 // 发送缓冲区和接收缓冲区
-uint8_t sendBuffer[64];
-uint8_t sendIndex = 0;
+volatile uint8_t sendBuffer[8];
+volatile uint8_t sendIndex = 0;
 
 // 发送和接收状态标志
 volatile uint8_t sending = 0;
@@ -25,53 +25,23 @@ void Uart_SendByte(uint8_t data);
 uint8_t Uart_ReceiveByte(void);
 void TIM3_IRQHandler(void);
 
-
-int main1(void)
-{
-	USART_GPIO_Init();
-    Timer3_Init(9600,8);
-   
-
-    // 假设要发送的数据
-    sendBuffer[0] = 'H';
-    sendBuffer[1] = 'e';
-    sendBuffer[2] = 'l';
-    sendBuffer[3] = 'l';
-    sendBuffer[4] = 'o';
-    sendBuffer[5] = '\n';
-    sendIndex = 6;
-    //Uart_SendByte(0x04);
-    while (1)
-    {
-        // 处理接收的数据
-        // if (receiveIndex > 0)
-        // {
-            // 在这里可以对接收的数据进行处理
-            // for (int i = 0; i < receiveIndex; i++)
-            // {
-            //     // 例如，将接收到的数据再次发送出去
-            //     sendBuffer[sendIndex++] = receiveBuffer[i];
-            // }
-        //     printf("Received data: %d\n",Uart_ReceiveByte());
-        //     receiveIndex = 0;
-        // }
-    }
-}
 static int l_nUartWordLength = 8;
 
-void Timer3_Init(int BAUD_RATE,int USART_WordLength)
+void Timer3_Init(int BAUD_RATE, int USART_WordLength)
 {
-    if(BAUD_RATE<4800||BAUD_RATE>115200){
-       BAUD_RATE=9600; 
+    if (BAUD_RATE < 4800 || BAUD_RATE > 119200)
+    {
+        BAUD_RATE = 9600;
     }
-    if(USART_WordLength<7||USART_WordLength>9){
-       USART_WordLength=8; 
+    if (USART_WordLength < 7 || USART_WordLength > 9)
+    {
+        USART_WordLength = 8;
     }
-    l_nUartWordLength = USART_WordLength;       //设置有效位
+    l_nUartWordLength = USART_WordLength; // 设置有效位
     // 开启定时器 3 时钟
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
-    TIM_Cmd(TIM3, DISABLE);     //关闭定时器，防止冲突
-    int TIMER_PERIOD=(1000000/ BAUD_RATE);
+    TIM_Cmd(TIM3, DISABLE); // 关闭定时器，防止冲突
+    int TIMER_PERIOD = (72000000 / BAUD_RATE);
 
     TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
     TIM_TimeBaseStructure.TIM_Period = TIMER_PERIOD - 1;
@@ -91,8 +61,8 @@ void Timer3_Init(int BAUD_RATE,int USART_WordLength)
     NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
     NVIC_Init(&NVIC_InitStructure);
     sendIndex = 0;
-    UART_IO_RxCount=0;
-    UART_IO_ReceiveState=0;
+    UART_IO_RxCount = 0;
+    UART_IO_ReceiveState = 0;
     // 启动定时器
     TIM_Cmd(TIM3, ENABLE);
 }
@@ -106,25 +76,32 @@ void USART_GPIO_Init(void)
 
     // 配置 PA9 为推挽输出，用于模拟串口发送
     GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9;
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP; // 外部上拉推挽输出
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
     GPIO_Init(GPIOA, &GPIO_InitStructure);
 
     // 配置 PA10 为浮空输入，用于模拟串口接收
     GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10;
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
+    // GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU; // 外部上拉输入
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;        //外部浮空输入
     GPIO_Init(GPIOA, &GPIO_InitStructure);
 }
-void Uart_SendByteStr(uint8_t *str,int len)
+void Uart_SendByteStr(uint8_t *str, int len)
 {
-    for(int i=0;i<len;i++){
-        while (sending){    
-            // 等待发送完成           
+    for (int i = 0; i < len; i++)
+    {   
+        uint32_t counterTimeout = 0;
+        while (sending)
+        {
+            if(counterTimeout++>1000000) {
+                LOG(LOG_CRIT, "\r\nUart_SendByteStr  timeout\r\n"      );
+                break;
+            }
+            // 等待发送完成
         }
         Uart_SendByte(str[i]);
     }
 }
-
 
 void Uart_SendByte(uint8_t data)
 {
@@ -138,11 +115,9 @@ void Uart_SendByte(uint8_t data)
     }
 }
 
-
-
 void TIM3_IRQHandler(void)
 {
-    if (TIM_GetITStatus(TIM3, TIM_IT_Update)!= RESET)
+    if (TIM_GetITStatus(TIM3, TIM_IT_Update) != RESET)
     {
         // static int flag=0;
         // if(flag==0) {
@@ -155,11 +130,11 @@ void TIM3_IRQHandler(void)
 
         // TIM_ClearITPendingBit(TIM3, TIM_IT_Update);
         // return ;
-        
+
         if (sending)
         {
-            static uint8_t dataToSend;
-            static uint8_t bitIndex = 0;
+            volatile static uint8_t dataToSend;
+            volatile static uint8_t bitIndex = 0;
 
             if (bitIndex == 0)
             {
@@ -199,23 +174,26 @@ void TIM3_IRQHandler(void)
 
         if (receiving)
         {
-            static uint8_t receivedData = 0;
-            static uint8_t bitIndex = 0;
-            static uint8_t busIdelCounter = 0;      //总线空闲计数
-            #define MAX_IDEL_TIME  (100) //总线空闲时间
+            volatile static uint8_t receivedData = 0;
+            volatile static uint8_t bitIndex = 0;
+            volatile static uint8_t busIdelCounter = 0; // 总线空闲计数
+#define MAX_IDEL_TIME (100)                    // 总线空闲时间
             if (bitIndex == 0)
             {
                 if (GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_10) == 0)
                 {
                     // 检测到开始位
                     bitIndex++;
-                    busIdelCounter=0;
-                }else{
-                    if(busIdelCounter++>MAX_IDEL_TIME){  
-                        busIdelCounter=MAX_IDEL_TIME;
-                        if (UART_IO_RxCount>0)  //接收缓冲区有数据,且有数据空闲时间超过MAX_IDEL_TIME
+                    busIdelCounter = 0;
+                }
+                else
+                {
+                    if (busIdelCounter++ > MAX_IDEL_TIME)
+                    {
+                        busIdelCounter = MAX_IDEL_TIME;
+                        if (UART_IO_RxCount > 0) // 接收缓冲区有数据,且有数据空闲时间超过MAX_IDEL_TIME
                         {
-                            UART_IO_ReceiveState=1;    
+                            UART_IO_ReceiveState = 1;
                         }
                     }
                 }
@@ -228,12 +206,12 @@ void TIM3_IRQHandler(void)
                     receivedData |= 0x80;
                 bitIndex++;
             }
-            else if (bitIndex == l_nUartWordLength+1)
+            else if (bitIndex == l_nUartWordLength + 1)
             {
                 // 检测到停止位
                 // receiveBuffer[receiveIndex++] = receivedData;
-                //把接收到的字节保存，数组地址加1
-		        UART_IO_RxBuffer[UART_IO_RxCount++] = receivedData;
+                // 把接收到的字节保存，数组地址加1
+                UART_IO_RxBuffer[UART_IO_RxCount++] = receivedData;
                 bitIndex = 0;
             }
         }

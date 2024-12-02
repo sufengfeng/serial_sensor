@@ -381,7 +381,7 @@ void UART1_Frame_Handler(USART_TypeDef *USARTtype, volatile uint8_t buffer[], vo
 		SaveCurrentBasicParam();
 		Reboot();
 	}
-	else if (!strncmp((const char *)buffer, "page_setting", strlen("page_setting"))) //"SaveSerialParam"	保存串口参数
+	else if (!strncmp((const char *)buffer, "page_com_setting", strlen("page_com_setting"))) //"page_com_setting"	保存串口参数
 	{
 		UpdateUiInit(); //
 	}
@@ -543,15 +543,15 @@ int UpdateUiInit(void)
 	memset(sendBuffer, 0, 128);
 	GlobalBasicParam *p_sGlobalBasicParam = (void *)GetBasicParamHandle();
 	// sprintf(sendBuffer, "setting.cb0.txt=\"%d\" \xff\xff\xff", p_sGlobalBasicParam->m_nBaudRate);	// 波特率
-	sprintf(sendBuffer, "setting.cb0.txt=\" %d\"\xff\xff\xff", p_sGlobalBasicParam->m_nBaudRate);
+	sprintf(sendBuffer, "com_setting.cb0.txt=\" %d\"\xff\xff\xff", p_sGlobalBasicParam->m_nBaudRate);
 	USART1_SendStr(sendBuffer, strlen(sendBuffer));
 
 	memset(sendBuffer, 0, 128);
-	sprintf(sendBuffer, "setting.cb1.txt=\"%d\"\xff\xff\xff", p_sGlobalBasicParam->m_nWordLength); // 数据位
+	sprintf(sendBuffer, "com_setting.cb1.txt=\"%d\"\xff\xff\xff", p_sGlobalBasicParam->m_nWordLength); // 数据位
 	USART1_SendStr(sendBuffer, strlen(sendBuffer));
 
 	memset(sendBuffer, 0, 128);
-	sprintf(sendBuffer, "setting.cb2.txt=\"%d\"\xff\xff\xff", p_sGlobalBasicParam->m_nStopBits); // 停止位
+	sprintf(sendBuffer, "com_setting.cb2.txt=\"%d\"\xff\xff\xff", p_sGlobalBasicParam->m_nStopBits); // 停止位
 	USART1_SendStr(sendBuffer, strlen(sendBuffer));
 
 	if (p_sGlobalBasicParam->m_nParity == enumNone)
@@ -567,7 +567,7 @@ int UpdateUiInit(void)
 		sprintf(tmpBuffer, "Even");
 	}
 	memset(sendBuffer, 0, 128);
-	sprintf(sendBuffer, "setting.cb3.txt=\"%s\"\xff\xff\xff", tmpBuffer); // 奇偶校验
+	sprintf(sendBuffer, "com_setting.cb3.txt=\"%s\"\xff\xff\xff", tmpBuffer); // 奇偶校验
 	USART1_SendStr(sendBuffer, strlen(sendBuffer));
 }
 // 100ms回调事件
@@ -672,9 +672,10 @@ int main(void)
 
 	USART_GPIO_Init(); // 初始化串口GPIO
 	GlobalBasicParam *p_sGlobalBasicParam = (void *)GetBasicParamHandle();
-	Timer3_Init(p_sGlobalBasicParam->m_nBaudRate, p_sGlobalBasicParam->m_nWordLength); // 初始化定时器3
-	// Timer3_Init(9600, 8); // 初始化定时器3
-	Uart_SendByte(0x04);
+	// Timer3_Init(p_sGlobalBasicParam->m_nBaudRate, p_sGlobalBasicParam->m_nWordLength); // 初始化定时器3
+	Timer3_Init(9600, 8); // 初始化定时器3
+	//Uart_SendByte(0x04);
+	Uart_SendByteStr("OK");
 	printf("Init Done\n");
 	LOG(LOG_CRIT, "\n\rCopyright (c) 2021,Geekplus All rights reserved.\n\rRelease SafePLC version=[0x%08lx] %s-%s\r\n", p_sGlobalBasicParam->m_nAppVersion, __DATE__, __TIME__);
 	// extern void Flash_Write_Read_Example(void) ;
