@@ -584,21 +584,19 @@ void	TriggerBoardLed(void)	{
 		BoardLED1_Off();
 	}
 }
-// 100ms回调事件
+// 1000ms回调事件
 void Func_Task_1000ms01(void)
 {
-	
 	TriggerBoardLed();
 	UpdateUiPeriod();	// 周期更新数据到串口屏
 	ControlShowLed(); // 控制气体是否稳定显示灯
 	ControlRemoteStatue();	// 远程控制状态显示
-	// printf("[%s%d][%fmbar]\n", __func__, __LINE__, g_fV_mbar);
-	// sprintf(sendBuffer, "*RP?:");
-	// int ret = Frame_CheckSum_(sendBuffer, strlen(sendBuffer));
-	// printf("[%s%d][%s][%d]\n", __func__, __LINE__, sendBuffer, ret);
-	// sprintf(sendBuffer, "*IZ:");
-	// ret = Frame_CheckSum_(sendBuffer, strlen(sendBuffer));
-	// printf("[%s%d][%s][%d]\n", __func__, __LINE__, sendBuffer, ret);
+	static uint8_t counter3s = 0; // 3s计数器
+	if (++counter3s >= 3)
+    {
+		counter3s = 0;
+		BatteryManagementTask(); // 电池管理任务
+	}
 }
 // 1ms中断事件
 void Func_Task_Interrupt(void)
@@ -660,6 +658,7 @@ int main(void)
 	USART2_Config();
 	USART3_Config();
 	TIM2_Config(); // 1KHZ
+	ADC_Configuration();	// ADC初始化
 
 	USART1_SendByte(0x01);
 	// USART2_SendByte(0x02);
