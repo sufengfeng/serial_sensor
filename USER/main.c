@@ -184,7 +184,7 @@ float g_fV_rate = 0;			 // psi压力值变化率
 float g_fV_rateMax = 0.00145;	 // psi压力值变化率最大值
 uint8_t g_bIsAutoZero = 0;		 // 自动校零标志位
 uint8_t g_bIsAutoZeroReason = 0; // 自动校零原因	0：无，bit1：命令行，bit2：界面
-uint8_t g_bFlageStatus = 0;		 // 远程模式标志位
+uint8_t g_bFlageStatus = 0;		 // 远程模式标志位	0：本地模式，1：远程模式
 
 uint8_t g_nValiddecimal=5;	// 小数点有效位
 // 函数功能：根据输入的小数点位数生成对应的格式控制字符串
@@ -298,14 +298,7 @@ void UART_IO_Frame_Handler(USART_TypeDef *USARTtype, volatile uint8_t buffer[], 
 	}
 	else if (!strncmp((const char *)buffer, PR_COMMAND_REMOTE, strlen(PR_COMMAND_REMOTE))) // 设置为远程模式
 	{
-		if (g_bFlageStatus)
-		{ // 初始化
-			g_bFlageStatus = 0;
-		}
-		else
-		{
-			g_bFlageStatus = 1;
-		}
+		g_bFlageStatus = 1;
 		Uart_SendByteStr(buffer, len);
 	}
 	else if (!strncmp((const char *)buffer, PR_COMMAND_AUTOZERO, strlen(PR_COMMAND_AUTOZERO))) // 自动校零
@@ -403,16 +396,34 @@ void UART1_Frame_Handler(USART_TypeDef *USARTtype, volatile uint8_t buffer[], vo
 	{
 		UpdateUiInit(); //
 	}
+	else if (!strncmp((const char *)buffer, "Cmd_SetLocal", strlen("Cmd_SetLocal"))) //"Cmd_SetLocal"	本地控制
+	{
+		g_bFlageStatus=0;
+	}
+	
 }
+
 void ControlRemoteStatue(void) // 控制自动校零
 {
-	if (g_bFlageStatus)
-	{
-		OpenRemoteLed();
-	}
-	else
-	{
-		CloseRemoteLed();
+	static uint8_t lastRemoteStatue = 0;
+	if (g_bFlageStatus != lastRemoteStatue){
+		lastRemoteStatue = g_bFlageStatus;
+		if (g_bFlageStatus)	//远程控制
+		{
+			char sendBuffer[128];
+			memset(sendBuffer, 0, 128);
+
+			sprintf(sendBuffer, "page home_page0\xff\xff\xff");		//跳转到显示界面
+			USART1_SendStr(sendBuffer, strlen(sendBuffer));
+
+			sprintf(sendBuffer, "setlayer m0_local,255\xff\xff\xff");	//将触摸区置于顶层
+			USART1_SendStr(sendBuffer, strlen(sendBuffer));
+			OpenRemoteLed();
+		}
+		else				//本地控制
+		{
+			CloseRemoteLed();
+		}
 	}
 }
 void Show_OverPress(void){
