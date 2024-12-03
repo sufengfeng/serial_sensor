@@ -186,6 +186,18 @@ uint8_t g_bIsAutoZero = 0;		 // 自动校零标志位
 uint8_t g_bIsAutoZeroReason = 0; // 自动校零原因	0：无，bit1：命令行，bit2：界面
 uint8_t g_bFlageStatus = 0;		 // 远程模式标志位
 
+uint8_t g_nValiddecimal=5;	// 小数点有效位
+// 函数功能：根据输入的小数点位数生成对应的格式控制字符串
+// 参数：
+//      decimalPlaces：表示小数点后要保留的位数，类型为整数
+// 返回值：
+//      返回生成的格式控制字符串，类型为字符数组指针（这里返回指向静态局部变量的指针，需注意其使用限制）
+char* getFormatString(int decimalPlaces)
+{
+    static char formatStr[32];  // 定义静态局部变量用于存储格式控制字符串
+    sprintf(formatStr, "%%.%df", decimalPlaces);	// 根据传入的小数点位数，生成对应的格式控制字符串
+    return formatStr;
+}
 /*******************************************************************************
  * Function Name : UART2_Frame_Handler
  * Description   : 处理数据帧（提取完整数据帧，并校正数据）
@@ -241,23 +253,29 @@ void ReponceComandPR(void)
 {
 	char sendBuffer[128];
 	memset(sendBuffer, 0, 128);
+
+	char tmpBuffer[128];
+	memset(tmpBuffer, 0, 128);
 	float bmpValue = fabs(g_fV_rate);
 	if (bmpValue > g_fV_rateMax)
 	{
-		sprintf(sendBuffer, "NR      %.3f psi g\r\n", g_fV_psi);
-		Uart_SendByteStr(sendBuffer, strlen(sendBuffer));
+		sprintf(tmpBuffer, "NR      %s psi g\r\n",getFormatString(g_nValiddecimal-1));
+		sprintf(sendBuffer, tmpBuffer, g_fV_psi);
 	}
 	else
 	{
-		sprintf(sendBuffer, "R       %.3f psi g\r\n", g_fV_psi);
-		Uart_SendByteStr(sendBuffer, strlen(sendBuffer));
+		sprintf(tmpBuffer, "R       %s psi g\r\n", getFormatString(g_nValiddecimal-1));
+		sprintf(sendBuffer, tmpBuffer, g_fV_psi);
 	}
+	Uart_SendByteStr(sendBuffer, strlen(sendBuffer));
 }
 void ReponceComandREAD(void)
 {
 	char sendBuffer[128];
+	char tmpBuffer[128];
 	memset(sendBuffer, 0, 128);
-	sprintf(sendBuffer, "%.3f\r\n", g_fV_psi);
+	sprintf(tmpBuffer, "%s\r\n",getFormatString(g_nValiddecimal-1));
+	sprintf(sendBuffer, tmpBuffer, g_fV_psi);
 	Uart_SendByteStr(sendBuffer, strlen(sendBuffer));
 }
 
@@ -513,14 +531,17 @@ int UpdateUiPeriod(void)
 	static float last_V_psi = 0;
 	last_V_psi = g_fV_psi;
 	char sendBuffer[128];
+	char tmpBuffer[128];
 	g_fV_psi = 0.0145037744 * g_fV_mbar;
 	if (g_fV_psi >= 0)
 	{
-		sprintf(sendBuffer, "home_page0.t0.txt=\" %.5f\"\xff\xff\xff", g_fV_psi);
+		sprintf(tmpBuffer, "home_page0.t0.txt=\" %s\"\xff\xff\xff",getFormatString(g_nValiddecimal));
+		sprintf(sendBuffer, tmpBuffer, g_fV_psi);
 	}
 	else
 	{
-		sprintf(sendBuffer, "home_page0.t0.txt=\"%.5f\"\xff\xff\xff", g_fV_psi);
+		sprintf(tmpBuffer, "home_page0.t0.txt=\"%s\"\xff\xff\xff",getFormatString(g_nValiddecimal));
+		sprintf(sendBuffer, tmpBuffer, g_fV_psi);
 	}
 
 	USART1_SendStr(sendBuffer, strlen(sendBuffer));
@@ -528,11 +549,13 @@ int UpdateUiPeriod(void)
 	g_fV_rate = g_fV_psi - last_V_psi;
 	if (g_fV_rate >= 0)
 	{
-		sprintf(sendBuffer, "home_page0.t3.txt=\" %.5f\"\xff\xff\xff", g_fV_rate);
+		sprintf(tmpBuffer, "home_page0.t3.txt=\" %s\"\xff\xff\xff",getFormatString(g_nValiddecimal));
+		sprintf(sendBuffer, tmpBuffer, g_fV_rate);
 	}
 	else
 	{
-		sprintf(sendBuffer, "home_page0.t3.txt=\"%.5f\"\xff\xff\xff", g_fV_rate);
+		sprintf(tmpBuffer, "home_page0.t3.txt=\"%s\"\xff\xff\xff",getFormatString(g_nValiddecimal));
+		sprintf(sendBuffer, tmpBuffer, g_fV_rate);
 	}
 	USART1_SendStr(sendBuffer, strlen(sendBuffer));
 }
@@ -643,6 +666,20 @@ void TaskSchedule(void)
 			(*(g_sTimerArray[i].funcCallBack))();
 		}
 	}
+}
+
+int maintest_getFormatString()
+{
+    float g_fV_psi = 3.1415926;  // 示例的浮点数变量值，实际会根据程序情况变化
+    int decimalPlaces = 3;  // 假设这里想要保留小数点后3位，可根据实际需求动态改变
+
+    char* formatStr = getFormatString(decimalPlaces);
+    char sendBuffer[100];  // 根据实际可能的最长字符串长度合理设置缓冲区大小
+
+    sprintf(sendBuffer, "home_page0.t0.txt=\" %s\"\xff\xff\xff", formatStr, g_fV_psi);
+    printf(sendBuffer, g_fV_psi);
+
+    return 0;
 }
 
 extern int main1(void);
