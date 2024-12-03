@@ -269,7 +269,7 @@ void ReponceComandREAD(void)
  *******************************************************************************/
 void UART_IO_Frame_Handler(USART_TypeDef *USARTtype, volatile uint8_t buffer[], volatile uint8_t len)
 {
-	printf("[%s%d][%s][%d]\n", __func__, __LINE__, buffer, len);
+	printf("[%s%d][%s][%d][%d]\n", __func__, __LINE__, buffer, len,buffer[0]);
 	if (!strncmp((const char *)buffer, PR_COMMAND_CLS, strlen(PR_COMMAND_CLS))) // «Â∆¡
 	{																			//  ’µΩ√¸¡Ó
 		Uart_SendByteStr(PR_RESPONE_OK, strlen(PR_RESPONE_OK));
