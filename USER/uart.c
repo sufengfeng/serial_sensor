@@ -42,7 +42,14 @@ void USART1_Config(void){
 	// GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10;
 	// GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
 	// GPIO_Init(GPIOA,&GPIO_InitStructure);
-
+/*	¥˝—È÷§*/
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6|GPIO_Pin_7;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_Init(GPIOB,&GPIO_InitStructure);
+	GPIO_SetBits(GPIOB,GPIO_Pin_6);
+	GPIO_SetBits(GPIOB,GPIO_Pin_7);
+	
 	//≈‰÷√TXD
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;

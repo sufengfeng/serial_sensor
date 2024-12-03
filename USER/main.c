@@ -499,8 +499,9 @@ void Func_Task_10ms01(void)
 void Func_Task_100ms01(void)
 {
 	USART2_SendStr(SENSOR_COMMAND_RP, strlen(SENSOR_COMMAND_RP)); // 发送查询命令
-	
 	ControlAutoZero();	// 控制自动校零
+	// Uart_SendByte('O');
+	//Uart_SendByte(0x5A);
 }
 int SendComandAutoZero(void)
 {
@@ -570,9 +571,7 @@ int UpdateUiInit(void)
 	sprintf(sendBuffer, "com_setting.cb3.txt=\"%s\"\xff\xff\xff", tmpBuffer); // 奇偶校验
 	USART1_SendStr(sendBuffer, strlen(sendBuffer));
 }
-// 100ms回调事件
-void Func_Task_1000ms01(void)
-{
+void	TriggerBoardLed(void)	{
 	static uint8_t flag = 0;
 	if (flag)
 	{
@@ -584,8 +583,12 @@ void Func_Task_1000ms01(void)
 		flag = 1;
 		BoardLED1_Off();
 	}
-
+}
+// 100ms回调事件
+void Func_Task_1000ms01(void)
+{
 	
+	TriggerBoardLed();
 	UpdateUiPeriod();	// 周期更新数据到串口屏
 	ControlShowLed(); // 控制气体是否稳定显示灯
 	ControlRemoteStatue();	// 远程控制状态显示
@@ -672,15 +675,14 @@ int main(void)
 
 	USART_GPIO_Init(); // 初始化串口GPIO
 	GlobalBasicParam *p_sGlobalBasicParam = (void *)GetBasicParamHandle();
-	// Timer3_Init(p_sGlobalBasicParam->m_nBaudRate, p_sGlobalBasicParam->m_nWordLength); // 初始化定时器3
-	Timer3_Init(9600, 8); // 初始化定时器3
-	//Uart_SendByte(0x04);
-	Uart_SendByteStr("OK");
+	// Timer3_Init(p_sGlobalBasicParam->m_nBaudRate, p_sGlobalBasicParam->m_nWordLength,0,1); // 初始化定时器3
+	Timer3_Init(9600, 8,0,1); // 初始化定时器3
+	// Uart_SendByte(0x04);
+	// Uart_SendByteStr("OK");
 	printf("Init Done\n");
 	LOG(LOG_CRIT, "\n\rCopyright (c) 2021,Geekplus All rights reserved.\n\rRelease SafePLC version=[0x%08lx] %s-%s\r\n", p_sGlobalBasicParam->m_nAppVersion, __DATE__, __TIME__);
 	// extern void Flash_Write_Read_Example(void) ;
 	// Flash_Write_Read_Example();
-	// main1();
 	while (1)
 	{
 		// 如果UART1接收到1帧数据
