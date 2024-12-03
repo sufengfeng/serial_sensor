@@ -386,6 +386,30 @@ void UART1_Frame_Handler(USART_TypeDef *USARTtype, volatile uint8_t buffer[], vo
 		}
 		PrintBasicParam(p_sGlobalBasicParam);
 	}
+	else if (!strncmp((const char *)buffer, "stabLimVal", strlen("stabLimVal"))) // BaudRate=9600;WordLength=8;StopBits=1;Parity=None
+	{
+		GlobalBasicParam *p_sGlobalBasicParam = (void *)GetBasicParamHandle();
+		float tmpVal;
+		sscanf((const char *)buffer, "stabLimVal=%f",&tmpVal);
+		if(tmpVal>0.0001&&tmpVal<1){
+			g_fV_rateMax=tmpVal;
+			LOG(LOG_INFO,"g_fV_rateMax=%f",g_fV_rateMax);
+		}else{
+			LOG(LOG_ERR,"stabLimVal error[%s]%d",buffer,tmpVal);
+		}
+	}
+	else if (!strncmp((const char *)buffer, "ValvalidDec", strlen("ValvalidDec"))) // BaudRate=9600;WordLength=8;StopBits=1;Parity=None
+	{
+		GlobalBasicParam *p_sGlobalBasicParam = (void *)GetBasicParamHandle();
+		int tmpVal;
+		sscanf((const char *)buffer, "ValvalidDec=%d",&tmpVal);
+		if(tmpVal>0&&tmpVal<8){
+			g_nValiddecimal=tmpVal;
+			LOG(LOG_INFO,"g_nValiddecimal=%d",g_nValiddecimal);
+		}else{
+			LOG(LOG_ERR,"g_nValiddecimal error[%s]%d",buffer,tmpVal);
+		}
+	}
 	else if (!strncmp((const char *)buffer, "SaveSerialParam", strlen("SaveSerialParam"))) //"SaveSerialParam"	保存串口参数
 	{
 		printf("[%s][%d]SaveSerialParam\n", __func__, __LINE__);
