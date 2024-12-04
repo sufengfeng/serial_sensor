@@ -661,7 +661,9 @@ void TriggerBoardLed(void)
 // 1000ms回调事件
 void Func_Task_1000ms01(void)
 {
-	// TriggerBoardLed();
+#if DEBUG_SIMULATOR == 0
+	TriggerBoardLed();
+#endif
 	UpdateUiPeriod();			  // 周期更新数据到串口屏
 	ControlShowLed();			  // 控制气体是否稳定显示灯
 	ControlRemoteStatue();		  // 远程控制状态显示
@@ -763,7 +765,7 @@ int main(void)
 	USART_GPIO_Init(); // 初始化串口GPIO
 	GlobalBasicParam *p_sGlobalBasicParam = (void *)GetBasicParamHandle();
 	// Timer3_Init(p_sGlobalBasicParam->m_nBaudRate, p_sGlobalBasicParam->m_nWordLength,0,1); // 初始化定时器3
-	Timer3_Init(9600, 7, 2, 1); // 初始化定时器3
+	Timer3_Init(9600, 7, 0, 2); // 初始化定时器3
 	// Uart_SendByte(0x04);
 	// Uart_SendByteStr("OK");
 	printf("Init Done\n");
