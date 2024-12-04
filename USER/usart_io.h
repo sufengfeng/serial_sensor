@@ -32,6 +32,6 @@ enum
 
 #define MAX_BUFSIZE 3000 // 收发最大字符数量
 uint8_t GetUartIOCounter(void);
-#define DEBUG_SIMULATOR 1
+#define DEBUG_SIMULATOR 0 // 调试串口的开关
 
 #endif

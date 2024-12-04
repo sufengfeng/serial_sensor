@@ -564,8 +564,11 @@ void Func_Task_100ms01(void)
 	ControlAutoZero();											  // 控制自动校零
 // Uart_SendByte('O');
 #if DEBUG_SIMULATOR
-	Uart_SendByte(0x5A);
-// Uart_SendByte(0x5B);
+	// Uart_SendByte(0x5A);
+	// Uart_SendByte(0x5B);
+	static uint8_t counter = 0;
+	Uart_SendByte(counter); // 发送数据}
+	counter++;
 #endif
 }
 int SendComandAutoZero(void)

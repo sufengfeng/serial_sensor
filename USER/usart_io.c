@@ -19,7 +19,7 @@ typedef enum
 // 定义停止位模式枚举
 typedef enum
 {
-    ONE_STOP_None, // 无
+    None_STOP_BIT, // 无
     ONE_STOP_BIT,  // 1位停止位
     TWO_STOP_BITS  // 2位停止位
 } StopBitMode;
@@ -51,9 +51,17 @@ void Timer3_Init(int BAUD_RATE, int USART_WordLength, int USART_Parity, int USAR
     {
         BAUD_RATE = 9600;
     }
-    if (USART_WordLength < 7 || USART_WordLength > 9)
+    if (USART_WordLength < 7 || USART_WordLength > 8)
     {
         USART_WordLength = 8;
+    }
+    if (USART_Parity < 0 || USART_Parity > 2)
+    {
+        USART_Parity = 0;
+    }
+    if (USART_StopBits < 1 || USART_StopBits > 2)
+    {
+        USART_StopBits = 1;
     }
     currentParityMode = USART_Parity;    // 设置校验模式
     currentStopBitMode = USART_StopBits; // 设置停止位模式
