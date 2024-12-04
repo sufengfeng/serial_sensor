@@ -5,6 +5,7 @@
 #include "fifo.h"
 #include "stdio.h"
 #include "timer.h"
+#include "usart_io.h"
 volatile uint8_t UART1_RxBuffer[128] = {0x00};
 volatile uint8_t UART1_RxCount = 0;
 volatile uint8_t UART1_ReceiveState = 0;
@@ -186,17 +187,17 @@ uint8_t g_bIsAutoZero = 0;		 // 自动校零标志位
 uint8_t g_bIsAutoZeroReason = 0; // 自动校零原因	0：无，bit1：命令行，bit2：界面
 uint8_t g_bFlageStatus = 0;		 // 远程模式标志位	0：本地模式，1：远程模式
 
-uint8_t g_nValiddecimal=5;	// 小数点有效位
+uint8_t g_nValiddecimal = 5; // 小数点有效位
 // 函数功能：根据输入的小数点位数生成对应的格式控制字符串
 // 参数：
 //      decimalPlaces：表示小数点后要保留的位数，类型为整数
 // 返回值：
 //      返回生成的格式控制字符串，类型为字符数组指针（这里返回指向静态局部变量的指针，需注意其使用限制）
-char* getFormatString(int decimalPlaces)
+char *getFormatString(int decimalPlaces)
 {
-    static char formatStr[32];  // 定义静态局部变量用于存储格式控制字符串
-    sprintf(formatStr, "%%.%df", decimalPlaces);	// 根据传入的小数点位数，生成对应的格式控制字符串
-    return formatStr;
+	static char formatStr[32];					 // 定义静态局部变量用于存储格式控制字符串
+	sprintf(formatStr, "%%.%df", decimalPlaces); // 根据传入的小数点位数，生成对应的格式控制字符串
+	return formatStr;
 }
 /*******************************************************************************
  * Function Name : UART2_Frame_Handler
@@ -259,12 +260,12 @@ void ReponceComandPR(void)
 	float bmpValue = fabs(g_fV_rate);
 	if (bmpValue > g_fV_rateMax)
 	{
-		sprintf(tmpBuffer, "NR      %s psi g\r\n",getFormatString(g_nValiddecimal-1));
+		sprintf(tmpBuffer, "NR      %s psi g\r\n", getFormatString(g_nValiddecimal - 1));
 		sprintf(sendBuffer, tmpBuffer, g_fV_psi);
 	}
 	else
 	{
-		sprintf(tmpBuffer, "R       %s psi g\r\n", getFormatString(g_nValiddecimal-1));
+		sprintf(tmpBuffer, "R       %s psi g\r\n", getFormatString(g_nValiddecimal - 1));
 		sprintf(sendBuffer, tmpBuffer, g_fV_psi);
 	}
 	Uart_SendByteStr(sendBuffer, strlen(sendBuffer));
@@ -274,7 +275,7 @@ void ReponceComandREAD(void)
 	char sendBuffer[128];
 	char tmpBuffer[128];
 	memset(sendBuffer, 0, 128);
-	sprintf(tmpBuffer, "%s\r\n",getFormatString(g_nValiddecimal-1));
+	sprintf(tmpBuffer, "%s\r\n", getFormatString(g_nValiddecimal - 1));
 	sprintf(sendBuffer, tmpBuffer, g_fV_psi);
 	Uart_SendByteStr(sendBuffer, strlen(sendBuffer));
 }
@@ -287,7 +288,7 @@ void ReponceComandREAD(void)
  *******************************************************************************/
 void UART_IO_Frame_Handler(USART_TypeDef *USARTtype, volatile uint8_t buffer[], volatile uint8_t len)
 {
-	printf("[%s%d][%s][%d][%d]\n", __func__, __LINE__, buffer, len,buffer[0]);
+	printf("[%s%d][%s][%d][%d]\n", __func__, __LINE__, buffer, len, buffer[0]);
 	if (!strncmp((const char *)buffer, PR_COMMAND_CLS, strlen(PR_COMMAND_CLS))) // 清屏
 	{																			// 收到命令
 		Uart_SendByteStr(PR_RESPONE_OK, strlen(PR_RESPONE_OK));
@@ -390,24 +391,30 @@ void UART1_Frame_Handler(USART_TypeDef *USARTtype, volatile uint8_t buffer[], vo
 	{
 		GlobalBasicParam *p_sGlobalBasicParam = (void *)GetBasicParamHandle();
 		float tmpVal;
-		sscanf((const char *)buffer, "stabLimVal=%f",&tmpVal);
-		if(tmpVal>0.0001&&tmpVal<1){
-			g_fV_rateMax=tmpVal;
-			LOG(LOG_INFO,"g_fV_rateMax=%f",g_fV_rateMax);
-		}else{
-			LOG(LOG_ERR,"stabLimVal error[%s]%d",buffer,tmpVal);
+		sscanf((const char *)buffer, "stabLimVal=%f", &tmpVal);
+		if (tmpVal > 0.0001 && tmpVal < 1)
+		{
+			g_fV_rateMax = tmpVal;
+			LOG(LOG_INFO, "g_fV_rateMax=%f", g_fV_rateMax);
+		}
+		else
+		{
+			LOG(LOG_ERR, "stabLimVal error[%s]%d", buffer, tmpVal);
 		}
 	}
 	else if (!strncmp((const char *)buffer, "ValvalidDec", strlen("ValvalidDec"))) // BaudRate=9600;WordLength=8;StopBits=1;Parity=None
 	{
 		GlobalBasicParam *p_sGlobalBasicParam = (void *)GetBasicParamHandle();
 		int tmpVal;
-		sscanf((const char *)buffer, "ValvalidDec=%d",&tmpVal);
-		if(tmpVal>0&&tmpVal<8){
-			g_nValiddecimal=tmpVal;
-			LOG(LOG_INFO,"g_nValiddecimal=%d",g_nValiddecimal);
-		}else{
-			LOG(LOG_ERR,"g_nValiddecimal error[%s]%d",buffer,tmpVal);
+		sscanf((const char *)buffer, "ValvalidDec=%d", &tmpVal);
+		if (tmpVal > 0 && tmpVal < 8)
+		{
+			g_nValiddecimal = tmpVal;
+			LOG(LOG_INFO, "g_nValiddecimal=%d", g_nValiddecimal);
+		}
+		else
+		{
+			LOG(LOG_ERR, "g_nValiddecimal error[%s]%d", buffer, tmpVal);
 		}
 	}
 	else if (!strncmp((const char *)buffer, "SaveSerialParam", strlen("SaveSerialParam"))) //"SaveSerialParam"	保存串口参数
@@ -422,36 +429,36 @@ void UART1_Frame_Handler(USART_TypeDef *USARTtype, volatile uint8_t buffer[], vo
 	}
 	else if (!strncmp((const char *)buffer, "Cmd_SetLocal", strlen("Cmd_SetLocal"))) //"Cmd_SetLocal"	本地控制
 	{
-		g_bFlageStatus=0;
+		g_bFlageStatus = 0;
 	}
-	
 }
 
 void ControlRemoteStatue(void) // 控制自动校零
 {
 	static uint8_t lastRemoteStatue = 0;
-	if (g_bFlageStatus != lastRemoteStatue){
+	if (g_bFlageStatus != lastRemoteStatue)
+	{
 		lastRemoteStatue = g_bFlageStatus;
-		if (g_bFlageStatus)	//远程控制
+		if (g_bFlageStatus) // 远程控制
 		{
 			char sendBuffer[128];
 			memset(sendBuffer, 0, 128);
 
-			sprintf(sendBuffer, "page home_page0\xff\xff\xff");		//跳转到显示界面
+			sprintf(sendBuffer, "page home_page0\xff\xff\xff"); // 跳转到显示界面
 			USART1_SendStr(sendBuffer, strlen(sendBuffer));
 
-			sprintf(sendBuffer, "setlayer m0_local,255\xff\xff\xff");	//将触摸区置于顶层
+			sprintf(sendBuffer, "setlayer m0_local,255\xff\xff\xff"); // 将触摸区置于顶层
 			USART1_SendStr(sendBuffer, strlen(sendBuffer));
 			OpenRemoteLed();
 		}
-		else				//本地控制
+		else // 本地控制
 		{
 			CloseRemoteLed();
 		}
 	}
 }
-void Show_OverPress(void){
-
+void Show_OverPress(void)
+{
 }
 #define MAX_MPA_PROTECT (2100)
 void ControlAutoZero(void) // 控制自动校零
@@ -525,12 +532,14 @@ void ControlAutoZero(void) // 控制自动校零
 		break;
 		}
 	}
-	if(g_fV_mbar>MAX_MPA_PROTECT){
+	if (g_fV_mbar > MAX_MPA_PROTECT)
+	{
 		Show_OverPress();
 		CloseValve();
 	}
 }
-void ControlShowLed(void ){
+void ControlShowLed(void)
+{
 	if (g_fV_rate >= g_fV_rateMax)
 	{
 		ShowRedLed();
@@ -539,7 +548,7 @@ void ControlShowLed(void ){
 	{
 		ShowGreenLed();
 	}
-} 
+}
 // 1ms回调事件
 void Func_Task_1ms01(void)
 {
@@ -552,9 +561,12 @@ void Func_Task_10ms01(void)
 void Func_Task_100ms01(void)
 {
 	USART2_SendStr(SENSOR_COMMAND_RP, strlen(SENSOR_COMMAND_RP)); // 发送查询命令
-	ControlAutoZero();	// 控制自动校零
-	// Uart_SendByte('O');
-	//Uart_SendByte(0x5A);
+	ControlAutoZero();											  // 控制自动校零
+// Uart_SendByte('O');
+#if DEBUG_SIMULATOR
+	Uart_SendByte(0x5A);
+// Uart_SendByte(0x5B);
+#endif
 }
 int SendComandAutoZero(void)
 {
@@ -570,12 +582,12 @@ int UpdateUiPeriod(void)
 	g_fV_psi = 0.0145037744 * g_fV_mbar;
 	if (g_fV_psi >= 0)
 	{
-		sprintf(tmpBuffer, "home_page0.t0.txt=\" %s\"\xff\xff\xff",getFormatString(g_nValiddecimal));
+		sprintf(tmpBuffer, "home_page0.t0.txt=\" %s\"\xff\xff\xff", getFormatString(g_nValiddecimal));
 		sprintf(sendBuffer, tmpBuffer, g_fV_psi);
 	}
 	else
 	{
-		sprintf(tmpBuffer, "home_page0.t0.txt=\"%s\"\xff\xff\xff",getFormatString(g_nValiddecimal));
+		sprintf(tmpBuffer, "home_page0.t0.txt=\"%s\"\xff\xff\xff", getFormatString(g_nValiddecimal));
 		sprintf(sendBuffer, tmpBuffer, g_fV_psi);
 	}
 
@@ -584,12 +596,12 @@ int UpdateUiPeriod(void)
 	g_fV_rate = g_fV_psi - last_V_psi;
 	if (g_fV_rate >= 0)
 	{
-		sprintf(tmpBuffer, "home_page0.t3.txt=\" %s\"\xff\xff\xff",getFormatString(g_nValiddecimal));
+		sprintf(tmpBuffer, "home_page0.t3.txt=\" %s\"\xff\xff\xff", getFormatString(g_nValiddecimal));
 		sprintf(sendBuffer, tmpBuffer, g_fV_rate);
 	}
 	else
 	{
-		sprintf(tmpBuffer, "home_page0.t3.txt=\"%s\"\xff\xff\xff",getFormatString(g_nValiddecimal));
+		sprintf(tmpBuffer, "home_page0.t3.txt=\"%s\"\xff\xff\xff", getFormatString(g_nValiddecimal));
 		sprintf(sendBuffer, tmpBuffer, g_fV_rate);
 	}
 	USART1_SendStr(sendBuffer, strlen(sendBuffer));
@@ -629,7 +641,8 @@ int UpdateUiInit(void)
 	sprintf(sendBuffer, "com_setting.cb3.txt=\"%s\"\xff\xff\xff", tmpBuffer); // 奇偶校验
 	USART1_SendStr(sendBuffer, strlen(sendBuffer));
 }
-void	TriggerBoardLed(void)	{
+void TriggerBoardLed(void)
+{
 	static uint8_t flag = 0;
 	if (flag)
 	{
@@ -645,15 +658,15 @@ void	TriggerBoardLed(void)	{
 // 1000ms回调事件
 void Func_Task_1000ms01(void)
 {
-	TriggerBoardLed();
-	UpdateUiPeriod();	// 周期更新数据到串口屏
-	ControlShowLed(); // 控制气体是否稳定显示灯
-	ControlRemoteStatue();	// 远程控制状态显示
+	// TriggerBoardLed();
+	UpdateUiPeriod();			  // 周期更新数据到串口屏
+	ControlShowLed();			  // 控制气体是否稳定显示灯
+	ControlRemoteStatue();		  // 远程控制状态显示
 	static uint8_t counter3s = 0; // 3s计数器
 	if (++counter3s >= 3)
-    {
+	{
 		counter3s = 0;
-		BatteryManagementTask(); // 电池管理任务
+		// BatteryManagementTask(); // 电池管理任务
 	}
 }
 // 1ms中断事件
@@ -705,16 +718,16 @@ void TaskSchedule(void)
 
 int maintest_getFormatString()
 {
-    float g_fV_psi = 3.1415926;  // 示例的浮点数变量值，实际会根据程序情况变化
-    int decimalPlaces = 3;  // 假设这里想要保留小数点后3位，可根据实际需求动态改变
+	float g_fV_psi = 3.1415926; // 示例的浮点数变量值，实际会根据程序情况变化
+	int decimalPlaces = 3;		// 假设这里想要保留小数点后3位，可根据实际需求动态改变
 
-    char* formatStr = getFormatString(decimalPlaces);
-    char sendBuffer[100];  // 根据实际可能的最长字符串长度合理设置缓冲区大小
+	char *formatStr = getFormatString(decimalPlaces);
+	char sendBuffer[100]; // 根据实际可能的最长字符串长度合理设置缓冲区大小
 
-    sprintf(sendBuffer, "home_page0.t0.txt=\" %s\"\xff\xff\xff", formatStr, g_fV_psi);
-    printf(sendBuffer, g_fV_psi);
+	sprintf(sendBuffer, "home_page0.t0.txt=\" %s\"\xff\xff\xff", formatStr, g_fV_psi);
+	printf(sendBuffer, g_fV_psi);
 
-    return 0;
+	return 0;
 }
 
 extern int main1(void);
@@ -729,8 +742,8 @@ int main(void)
 	USART1_Config();
 	USART2_Config();
 	USART3_Config();
-	TIM2_Config(); // 1KHZ
-	ADC_Configuration();	// ADC初始化
+	TIM2_Config();		 // 1KHZ
+	ADC_Configuration(); // ADC初始化
 
 	USART1_SendByte(0x01);
 	// USART2_SendByte(0x02);
@@ -747,7 +760,7 @@ int main(void)
 	USART_GPIO_Init(); // 初始化串口GPIO
 	GlobalBasicParam *p_sGlobalBasicParam = (void *)GetBasicParamHandle();
 	// Timer3_Init(p_sGlobalBasicParam->m_nBaudRate, p_sGlobalBasicParam->m_nWordLength,0,1); // 初始化定时器3
-	Timer3_Init(9600, 8,0,1); // 初始化定时器3
+	Timer3_Init(9600, 7, 2, 1); // 初始化定时器3
 	// Uart_SendByte(0x04);
 	// Uart_SendByteStr("OK");
 	printf("Init Done\n");
@@ -778,9 +791,5 @@ int main(void)
 			UART_IO_ReceiveState = 0;
 		}
 		TaskSchedule();
-		// if(GetUartIOCounter()>0)	{
-		// 	printf("GetUartIOCounter:%d\n",GetUartIOCounter());
-		// 	printf("Received data: %d\n",Uart_ReceiveByte());
-		// }
 	}
 }
