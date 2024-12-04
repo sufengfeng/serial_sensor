@@ -70,9 +70,8 @@ void Timer3_Init(int BAUD_RATE, int USART_WordLength, int USART_Parity, int USAR
     // 开启定时器 3 时钟
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
     TIM_Cmd(TIM3, DISABLE); // 关闭定时器，防止冲突
-    int TIMER_PERIOD = (72000000 / BAUD_RATE);
-    // int TIMER_PERIOD = (72000000 / BAUD_RATE)/MAX_TIMER3_FILTER;
-    // int TIMER_PERIOD = (14400000 / BAUD_RATE);
+    // int TIMER_PERIOD = (72000000 / BAUD_RATE);
+    int TIMER_PERIOD = (14400000 / BAUD_RATE); // int TIMER_PERIOD = (72000000 / BAUD_RATE)/MAX_TIMER3_FILTER;
     TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
     TIM_TimeBaseStructure.TIM_Period = TIMER_PERIOD - 1;
     TIM_TimeBaseStructure.TIM_Prescaler = TIMER_PRESCALER - 1;
@@ -168,335 +167,98 @@ void Uart_SendByte(uint8_t data)
         TIM_SetCounter(TIM3, 0);
     }
 }
-
-inline static int TX_SET_IO(int value)
+// 定时器3中断处理函数，发送任务
+void SendTask(void)
 {
-
-    volatile static int call_count = 0; // 静态变量用于记录函数被调用的次数
-    // 每次调用时增加计数
-    call_count++;
-    if (value == 1)
-    { // 根据value设置A9引脚的电平
-        GPIO_SetBits(GPIOA, GPIO_Pin_9);
-    }
-    else
+    if (sending)
     {
-        GPIO_ResetBits(GPIOA, GPIO_Pin_9);
-    }
-    if (call_count < MAX_TIMER3_FILTER)
-    {
-        return 0; // 如果调用次数少于5次，返回值为0
-    }
-    else
-    {
-        call_count = 0;
-        return 1; // 如果调用次数达到5次，返回值为1
-    }
-}
-inline static int RX_GET_IO(int *result)
-{
+        volatile static uint8_t dataToSend;
+        volatile static uint8_t bitIndex = 0;
+        volatile static uint8_t parityBit = 0;
 
-    static int call_count = 0;     // 静态变量用于记录函数被调用的次数
-    static int positive_count = 0; // 静态变量用于记录引脚为正的次数
-    static int first_value = 0;    // 静态变量用于存储第一次读取到的值
-
-    call_count++; // 每次调用时增加计数
-
-    if (call_count == 1)
-    { // 如果是第一次调用，读取引脚的值并存储
-        first_value = GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_10);
-    }
-
-    if (GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_10) > 0)
-    { // 如果引脚的值为正，增加positive_count
-        positive_count++;
-    }
-
-    if (call_count < MAX_TIMER3_FILTER)
-    { // 如果调用次数少于5次，返回第一次读取到的值
-        *result = 0;
-        return first_value;
-    }
-    else
-    { // 如果调用次数达到5次，判断引脚为正的次数
-        *result = 1;
-        if (positive_count >= 3)
+        if (bitIndex == 0)
         {
-            call_count = 0;
-            positive_count = 0;
-            first_value = 0;
-            return 1; // 如果引脚为正的次数大于等于3，返回1
-        }
-        else
-        {
-            call_count = 0;
-            positive_count = 0;
-            first_value = 0;
-            return 0; // 否则返回0
-        }
-    }
-}
-volatile int l_RX_Flag = 0; // 接收滤波完成标识
-// 使用5次采样保证数据的稳定性
-void TIM3_IRQHandler_Filter(void)
-{
-    if (TIM_GetITStatus(TIM3, TIM_IT_Update) != RESET)
-    {
+            // 发送开始位
+            GPIO_ResetBits(GPIOA, GPIO_Pin_9);
 #if DEBUG_SIMULATOR
-        TriggerBoardLed();
+            GPIO_ResetBits(GPIOA, GPIO_Pin_10);
 #endif
-        if (sending)
+            dataToSend = sendBuffer[0];
+            sendIndex--;
+            bitIndex++;
+        }
+        else if (bitIndex <= l_nUartWordLength)
         {
-            volatile static uint8_t dataToSend;
-            volatile static uint8_t bitIndex = 0;
-            volatile int iFlag = 0; // 滤波完成标识
-            if (bitIndex == 0)
+            // 发送数据位
+            if (dataToSend & 0x01)
             {
-                // 发送开始位
-                // GPIO_ResetBits(GPIOA, GPIO_Pin_9);
-                iFlag = TX_SET_IO(0);
-                if (iFlag == 1)
-                {
-                    {
-                        dataToSend = sendBuffer[0];
-                        sendIndex--;
-                        bitIndex++;
-                    }
-                }
-                else if (bitIndex <= l_nUartWordLength)
-                {
-                    // 发送数据位
-                    if (dataToSend & 0x01)
-                    {
-                        // GPIO_SetBits(GPIOA, GPIO_Pin_9);
-                        iFlag = TX_SET_IO(1);
-                    }
-                    else
-                    {
-                        // GPIO_ResetBits(GPIOA, GPIO_Pin_9);
-                        iFlag = TX_SET_IO(0);
-                    }
-                    if (iFlag == 1)
-                    {
-                        dataToSend >>= 1;
-                        bitIndex++;
-                    }
-                }
+                GPIO_SetBits(GPIOA, GPIO_Pin_9);
+#if DEBUG_SIMULATOR
+                GPIO_SetBits(GPIOA, GPIO_Pin_10);
+#endif
             }
             else
             {
-                // 发送停止位
-                // GPIO_SetBits(GPIOA, GPIO_Pin_9);
-                iFlag = TX_SET_IO(1);
-                if (iFlag == 1)
-                {
-                    bitIndex = 0;
-                    if (sendIndex > 0)
-                    {
-                        // 还有数据要发送，继续发送下一个字节
-                        TIM_SetCounter(TIM3, 0);
-                    }
-                    else
-                    {
-                        // 发送完成，重置发送标志
-                        sending = 0;
-                    }
-                }
-            }
-        }
-
-        if (receiving)
-        {
-            volatile static uint8_t receivedData = 0;
-            volatile static uint8_t bitIndex = 0;
-            volatile static uint8_t busIdelCounter = 0; // 总线空闲计数
-            static uint8_t flagFirst = 0;
-            static char buff[32];
-#define MAX_IDEL_TIME (100) // 总线空闲时间
-            if (bitIndex == 0)
-            {
-                if (GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_10) == 0)
-                {
-                    volatile static uint8_t counter_RX = 0;
-                    if (counter_RX++ > 3)
-                    { // 检测到开始位
-                        counter_RX = 0;
-                        bitIndex++;
-                        busIdelCounter = 0;
-                        receivedData >>= 1;
-                    }
-                }
-                else
-                {
-                    if (busIdelCounter++ > MAX_IDEL_TIME)
-                    {
-                        busIdelCounter = MAX_IDEL_TIME;
-                        if (UART_IO_RxCount > 0) // 接收缓冲区有数据,且有数据空闲时间超过MAX_IDEL_TIME
-                        {
-                            UART_IO_ReceiveState = 1;
-                        }
-                    }
-                }
-            }
-            else if (bitIndex > 0 && bitIndex <= l_nUartWordLength)
-            {
-                // 接收数据位
-                int value = RX_GET_IO(&l_RX_Flag);
-                if (l_RX_Flag == 1)
-                {
-                    receivedData = receivedData >> 1; // 把接收到的数据位存入变量
-                    if (value == 1)
-                    {
-                        receivedData |= 0x80;
-                    }
-                    else
-                    {
-                        receivedData |= 0x00;
-                    }
-                    buff[flagFirst++] = receivedData;
-                    bitIndex++;
-                }
-            }
-            else if (bitIndex == l_nUartWordLength + 1)
-            {
-                // 检测到停止位
-                // receiveBuffer[receiveIndex++] = receivedData;
-                // 把接收到的字节保存，数组地址加1
-                UART_IO_RxBuffer[UART_IO_RxCount++] = receivedData;
-                receivedData = 0;
-                bitIndex = 0;
-            }
-        }
-        else
-        {
-            // 如果没有正在接收数据，检测开始位
-            if (RX_GET_IO(&l_RX_Flag) == 0)
-            {
-                receiving = 1;
-            }
-        }
-
-        TIM_ClearITPendingBit(TIM3, TIM_IT_Update);
-    }
-}
-volatile static uint8_t bitIndex = 0; // 接收位计数
-void TIM3_IRQHandler(void)
-{
-    if (TIM_GetITStatus(TIM3, TIM_IT_Update) != RESET)
-    {
-#if DEBUG_SIMULATOR
-        TriggerBoardLed();
-#endif // 调用LED闪烁函数
-        if (sending)
-        {
-            volatile static uint8_t dataToSend;
-            volatile static uint8_t bitIndex = 0;
-            volatile static uint8_t parityBit = 0;
-
-            if (bitIndex == 0)
-            {
-                // 发送开始位
                 GPIO_ResetBits(GPIOA, GPIO_Pin_9);
 #if DEBUG_SIMULATOR
                 GPIO_ResetBits(GPIOA, GPIO_Pin_10);
 #endif
-                dataToSend = sendBuffer[0];
-                sendIndex--;
-                bitIndex++;
             }
-            else if (bitIndex <= l_nUartWordLength)
+            if (currentParityMode == EVEN_PARITY)
             {
-                // 发送数据位
-                if (dataToSend & 0x01)
-                {
-                    GPIO_SetBits(GPIOA, GPIO_Pin_9);
-#if DEBUG_SIMULATOR
-                    GPIO_SetBits(GPIOA, GPIO_Pin_10);
-#endif
-                }
-                else
-                {
-                    GPIO_ResetBits(GPIOA, GPIO_Pin_9);
-#if DEBUG_SIMULATOR
-                    GPIO_ResetBits(GPIOA, GPIO_Pin_10);
-#endif
-                }
+                parityBit ^= (dataToSend & 0x01);
+            }
+            else if (currentParityMode == ODD_PARITY)
+            {
+                parityBit ^= (dataToSend & 0x01);
+            }
+            dataToSend >>= 1;
+            bitIndex++;
+        }
+        else if (bitIndex == l_nUartWordLength + 1)
+        {
+            if (currentParityMode != NO_PARITY)
+            {
                 if (currentParityMode == EVEN_PARITY)
                 {
-                    parityBit ^= (dataToSend & 0x01);
-                }
-                else if (currentParityMode == ODD_PARITY)
-                {
-                    parityBit ^= (dataToSend & 0x01);
-                }
-                dataToSend >>= 1;
-                bitIndex++;
-            }
-            else if (bitIndex == l_nUartWordLength + 1)
-            {
-                if (currentParityMode != NO_PARITY)
-                {
-                    if (currentParityMode == EVEN_PARITY)
+                    if (parityBit)
                     {
-                        if (parityBit)
-                        {
-                            GPIO_SetBits(GPIOA, GPIO_Pin_9);
+                        GPIO_SetBits(GPIOA, GPIO_Pin_9);
 #if DEBUG_SIMULATOR
-                            GPIO_SetBits(GPIOA, GPIO_Pin_10);
+                        GPIO_SetBits(GPIOA, GPIO_Pin_10);
 #endif
-                        }
-                        else
-                        {
-                            GPIO_ResetBits(GPIOA, GPIO_Pin_9);
-#if DEBUG_SIMULATOR
-                            GPIO_ResetBits(GPIOA, GPIO_Pin_10);
-#endif
-                        }
-                    }
-                    else if (currentParityMode == ODD_PARITY)
-                    {
-                        if (parityBit)
-                        {
-                            GPIO_ResetBits(GPIOA, GPIO_Pin_9);
-#if DEBUG_SIMULATOR
-                            GPIO_ResetBits(GPIOA, GPIO_Pin_10);
-#endif
-                        }
-                        else
-                        {
-                            GPIO_SetBits(GPIOA, GPIO_Pin_9);
-#if DEBUG_SIMULATOR
-                            GPIO_SetBits(GPIOA, GPIO_Pin_10);
-#endif
-                        }
-                    }
-                    bitIndex++;
-                }
-                else
-                {
-                    // 无校验，直接进入发送停止位流程
-                    // bitIndex++; // 注释掉这一行，因为不需要增加bitIndex
-                    GPIO_SetBits(GPIOA, GPIO_Pin_9);
-#if DEBUG_SIMULATOR
-                    GPIO_SetBits(GPIOA, GPIO_Pin_10);
-#endif
-                    bitIndex = 0;
-                    parityBit = 0;
-                    if (sendIndex > 0)
-                    {
-                        // 还有数据要发送，继续发送下一个字节
-                        TIM_SetCounter(TIM3, 0);
                     }
                     else
                     {
-                        // 发送完成，重置发送标志
-                        sending = 0;
+                        GPIO_ResetBits(GPIOA, GPIO_Pin_9);
+#if DEBUG_SIMULATOR
+                        GPIO_ResetBits(GPIOA, GPIO_Pin_10);
+#endif
                     }
                 }
+                else if (currentParityMode == ODD_PARITY)
+                {
+                    if (parityBit)
+                    {
+                        GPIO_ResetBits(GPIOA, GPIO_Pin_9);
+#if DEBUG_SIMULATOR
+                        GPIO_ResetBits(GPIOA, GPIO_Pin_10);
+#endif
+                    }
+                    else
+                    {
+                        GPIO_SetBits(GPIOA, GPIO_Pin_9);
+#if DEBUG_SIMULATOR
+                        GPIO_SetBits(GPIOA, GPIO_Pin_10);
+#endif
+                    }
+                }
+                bitIndex++;
             }
-            else if (bitIndex == l_nUartWordLength + (currentStopBitMode == ONE_STOP_BIT ? 2 : 3))
+            else
             {
-                // 根据停止位模式发送停止位
+                // 无校验，直接进入发送停止位流程
+                // bitIndex++; // 注释掉这一行，因为不需要增加bitIndex
                 GPIO_SetBits(GPIOA, GPIO_Pin_9);
 #if DEBUG_SIMULATOR
                 GPIO_SetBits(GPIOA, GPIO_Pin_10);
@@ -514,162 +276,203 @@ void TIM3_IRQHandler(void)
                     sending = 0;
                 }
             }
+        }
+        else if (bitIndex == l_nUartWordLength + (currentStopBitMode == ONE_STOP_BIT ? 2 : 3))
+        {
+            // 根据停止位模式发送停止位
+            GPIO_SetBits(GPIOA, GPIO_Pin_9);
+#if DEBUG_SIMULATOR
+            GPIO_SetBits(GPIOA, GPIO_Pin_10);
+#endif
+            bitIndex = 0;
+            parityBit = 0;
+            if (sendIndex > 0)
+            {
+                // 还有数据要发送，继续发送下一个字节
+                TIM_SetCounter(TIM3, 0);
+            }
             else
             {
-                // 发送额外的停止位（如果是 2 位停止位模式）
-                if (currentStopBitMode == TWO_STOP_BITS && bitIndex == l_nUartWordLength + 2)
-                {
-                    GPIO_SetBits(GPIOA, GPIO_Pin_9);
-#if DEBUG_SIMULATOR
-                    GPIO_SetBits(GPIOA, GPIO_Pin_10);
-#endif
-                    bitIndex++;
-                }
-            }
-        }
-
-        if (receiving)
-        {
-            volatile static uint8_t receivedData = 0;
-            // static uint8_t bitIndex = 0;
-            volatile static uint8_t busIdelCounter = 0;    // 总线空闲计数
-            volatile static uint8_t receivedParityBit = 0; // 接收到的奇偶校验位
-            volatile static uint8_t parityCheck = 0;       // 奇偶校验位检查
-
-#define MAX_IDEL_TIME (100) // 总线空闲时间
-            if (bitIndex == 0)
-            {
-                if (GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_10) == 0)
-                {
-                    // 检测到开始位
-                    bitIndex++;
-                    busIdelCounter = 0;
-                }
-                else
-                {
-                    if (busIdelCounter++ > MAX_IDEL_TIME)
-                    {
-                        busIdelCounter = MAX_IDEL_TIME;
-                        if (UART_IO_RxCount > 0) // 接收缓冲区有数据,且有数据空闲时间超过MAX_IDEL_TIME
-                        {
-
-                            UART_IO_ReceiveState = 1;
-                        }
-                        bitIndex = 0;
-                        receiving = 1; // 接收完成，准备接收下一个数据
-                    }
-                }
-            }
-            else if (bitIndex > 0 && bitIndex <= l_nUartWordLength)
-            {
-                // 接收数据位
-                receivedData >>= 1;
-                uint8_t tmpValue = 0;
-                tmpValue = GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_10);
-                if (tmpValue == 1)
-                    receivedData |= 0x80;
-                if (currentParityMode == EVEN_PARITY)
-                {
-                    parityCheck ^= (tmpValue & 0x01);
-                }
-                else if (currentParityMode == ODD_PARITY)
-                {
-                    parityCheck ^= (tmpValue & 0x01);
-                }
-                bitIndex++;
-            }
-            else if (bitIndex == l_nUartWordLength + 1) // 有无校验位
-            {
-                if (currentParityMode != NO_PARITY)
-                {
-                    receivedParityBit = GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_10);
-                    bitIndex++;
-                }
-                else
-                {
-                    if (l_nUartWordLength == 7)
-                    { // 如果数据为7位，则需右移一位
-                        receivedData >>= 1;
-                    }
-                    // 无校验，直接进入保存接收数据流程
-                    // 把接收到的字节保存，数组地址加1
-                    UART_IO_RxBuffer[UART_IO_RxCount++] = receivedData;
-                    receivedData = 0;
-                    bitIndex = 0;
-                    receivedParityBit = 0;
-                    parityCheck = 0;
-                }
-            }
-            else if (bitIndex == l_nUartWordLength + (currentStopBitMode == ONE_STOP_BIT ? 2 : 3)) // 有无停止位
-            {
-                if (currentParityMode != NO_PARITY)
-                {
-                    if (currentParityMode == EVEN_PARITY)
-                    {
-                        if (parityCheck == receivedParityBit)
-                        {
-                            if (l_nUartWordLength == 7)
-                            { // 如果数据为7位，则需右移一位
-                                receivedData >>= 1;
-                            }
-                            // 校验通过，把接收到的字节保存，数组地址加1
-                            UART_IO_RxBuffer[UART_IO_RxCount++] = receivedData;
-                            receivedData = 0;
-                        }
-                        else
-                        {
-                            // 校验失败，可以在这里添加相应错误处理逻辑，比如丢弃数据等
-                            LOG(LOG_CRIT, "\r\parityCheck  [%d][%d]\r\n", parityCheck, receivedParityBit);
-                        }
-                    }
-                    else if (currentParityMode == ODD_PARITY)
-                    {
-                        if (parityCheck != receivedParityBit)
-                        {
-                            if (l_nUartWordLength == 7)
-                            { // 如果数据为7位，则需右移一位
-                                receivedData >>= 1;
-                            }
-                            // 校验通过，把接接到的字节保存，数组地址加1
-                            UART_IO_RxBuffer[UART_IO_RxCount++] = receivedData;
-                            receivedData = 0;
-                        }
-                        else
-                        {
-                            // 校验失败，可以在这里添加相应错误处理逻辑，比如丢弃数据等
-                            LOG(LOG_CRIT, "\r\parityCheck  [%d][%d][%d]\r\n", parityCheck, receivedParityBit, receivedData);
-                        }
-                    }
-                    bitIndex = 0;
-                    receivedParityBit = 0;
-                    parityCheck = 0;
-                }
-                else
-                {
-                    if (l_nUartWordLength == 7)
-                    { // 如果数据为7位，则需右移一位
-                        receivedData >>= 1;
-                    }
-                    // 无校验时保存接收数据
-                    UART_IO_RxBuffer[UART_IO_RxCount++] = receivedData;
-                    receivedData = 0;
-                    bitIndex = 0;
-                }
-            }
-            else if (currentStopBitMode == TWO_STOP_BITS && bitIndex == l_nUartWordLength + 2)
-            {
-                // 等待第 2 位停止位，无实质操作，仅位计数增加
-                bitIndex++;
+                // 发送完成，重置发送标志
+                sending = 0;
             }
         }
         else
         {
-            // 如果没有正在接收数据，检测开始位
-            if (GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_10) == 0)
+            // 发送额外的停止位（如果是 2 位停止位模式）
+            if (currentStopBitMode == TWO_STOP_BITS && bitIndex == l_nUartWordLength + 2)
             {
-                receiving = 1;
+                GPIO_SetBits(GPIOA, GPIO_Pin_9);
+#if DEBUG_SIMULATOR
+                GPIO_SetBits(GPIOA, GPIO_Pin_10);
+#endif
+                bitIndex++;
             }
         }
+    }
+}
+volatile static uint8_t bitIndex = 0; // 接收位计数
+// 定时器3中断处理函数，接收任务
+void ReceiveTask(void)
+{
+    if (receiving)
+    {
+        volatile static uint8_t receivedData = 0;
+        // static uint8_t bitIndex = 0;
+        volatile static uint8_t busIdelCounter = 0;    // 总线空闲计数
+        volatile static uint8_t receivedParityBit = 0; // 接收到的奇偶校验位
+        volatile static uint8_t parityCheck = 0;       // 奇偶校验位检查
+
+#define MAX_IDEL_TIME (100) // 总线空闲时间
+        if (bitIndex == 0)
+        {
+            if (GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_10) == 0)
+            {
+                // 检测到开始位
+                bitIndex++;
+                busIdelCounter = 0;
+            }
+            else
+            {
+                if (busIdelCounter++ > MAX_IDEL_TIME)
+                {
+                    busIdelCounter = MAX_IDEL_TIME;
+                    if (UART_IO_RxCount > 0) // 接收缓冲区有数据,且有数据空闲时间超过MAX_IDEL_TIME
+                    {
+
+                        UART_IO_ReceiveState = 1;
+                    }
+                    bitIndex = 0;
+                    receiving = 1; // 接收完成，准备接收下一个数据
+                }
+            }
+        }
+        else if (bitIndex > 0 && bitIndex <= l_nUartWordLength)
+        {
+            // 接收数据位
+            receivedData >>= 1;
+            uint8_t tmpValue = 0;
+            tmpValue = GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_10);
+            if (tmpValue == 1)
+                receivedData |= 0x80;
+            if (currentParityMode == EVEN_PARITY)
+            {
+                parityCheck ^= (tmpValue & 0x01);
+            }
+            else if (currentParityMode == ODD_PARITY)
+            {
+                parityCheck ^= (tmpValue & 0x01);
+            }
+            bitIndex++;
+        }
+        else if (bitIndex == l_nUartWordLength + 1) // 有无校验位
+        {
+            if (currentParityMode != NO_PARITY)
+            {
+                receivedParityBit = GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_10);
+                bitIndex++;
+            }
+            else
+            {
+                if (l_nUartWordLength == 7)
+                { // 如果数据为7位，则需右移一位
+                    receivedData >>= 1;
+                }
+                // 无校验，直接进入保存接收数据流程
+                // 把接收到的字节保存，数组地址加1
+                UART_IO_RxBuffer[UART_IO_RxCount++] = receivedData;
+                receivedData = 0;
+                bitIndex = 0;
+                receivedParityBit = 0;
+                parityCheck = 0;
+            }
+        }
+        else if (bitIndex == l_nUartWordLength + (currentStopBitMode == ONE_STOP_BIT ? 2 : 3)) // 有无停止位
+        {
+            if (currentParityMode != NO_PARITY)
+            {
+                if (currentParityMode == EVEN_PARITY)
+                {
+                    if (parityCheck == receivedParityBit)
+                    {
+                        if (l_nUartWordLength == 7)
+                        { // 如果数据为7位，则需右移一位
+                            receivedData >>= 1;
+                        }
+                        // 校验通过，把接收到的字节保存，数组地址加1
+                        UART_IO_RxBuffer[UART_IO_RxCount++] = receivedData;
+                        receivedData = 0;
+                    }
+                    else
+                    {
+                        // 校验失败，可以在这里添加相应错误处理逻辑，比如丢弃数据等
+                        LOG(LOG_CRIT, "\r\parityCheck  [%d][%d]\r\n", parityCheck, receivedParityBit);
+                    }
+                }
+                else if (currentParityMode == ODD_PARITY)
+                {
+                    if (parityCheck != receivedParityBit)
+                    {
+                        if (l_nUartWordLength == 7)
+                        { // 如果数据为7位，则需右移一位
+                            receivedData >>= 1;
+                        }
+                        // 校验通过，把接接到的字节保存，数组地址加1
+                        UART_IO_RxBuffer[UART_IO_RxCount++] = receivedData;
+                        receivedData = 0;
+                    }
+                    else
+                    {
+                        // 校验失败，可以在这里添加相应错误处理逻辑，比如丢弃数据等
+                        LOG(LOG_CRIT, "\r\parityCheck  [%d][%d][%d]\r\n", parityCheck, receivedParityBit, receivedData);
+                    }
+                }
+                bitIndex = 0;
+                receivedParityBit = 0;
+                parityCheck = 0;
+            }
+            else
+            {
+                if (l_nUartWordLength == 7)
+                { // 如果数据为7位，则需右移一位
+                    receivedData >>= 1;
+                }
+                // 无校验时保存接收数据
+                UART_IO_RxBuffer[UART_IO_RxCount++] = receivedData;
+                receivedData = 0;
+                bitIndex = 0;
+            }
+        }
+        else if (currentStopBitMode == TWO_STOP_BITS && bitIndex == l_nUartWordLength + 2)
+        {
+            // 等待第 2 位停止位，无实质操作，仅位计数增加
+            bitIndex++;
+        }
+    }
+    else
+    {
+        // 如果没有正在接收数据，检测开始位
+        if (GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_10) == 0)
+        {
+            receiving = 1;
+        }
+    }
+}
+void TIM3_IRQHandler(void)
+{
+    if (TIM_GetITStatus(TIM3, TIM_IT_Update) != RESET)
+    {
+#if DEBUG_SIMULATOR
+        TriggerBoardLed();
+#endif // 调用LED闪烁函数
+        static uint8_t sendCounter = 0;
+        if (sendCounter++ > MAX_TIMER3_FILTER-2)
+        {
+            sendCounter = 0;
+            SendTask(); // 调用发送任务函数
+            ReceiveTask(); // 调用接收任务函数
+        }
+        //ReceiveTask(); // 调用接收任务函数
 
         TIM_ClearITPendingBit(TIM3, TIM_IT_Update);
     }

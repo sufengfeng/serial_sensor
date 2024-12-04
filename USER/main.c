@@ -765,7 +765,7 @@ int main(void)
 	USART_GPIO_Init(); // 初始化串口GPIO
 	GlobalBasicParam *p_sGlobalBasicParam = (void *)GetBasicParamHandle();
 	// Timer3_Init(p_sGlobalBasicParam->m_nBaudRate, p_sGlobalBasicParam->m_nWordLength,0,1); // 初始化定时器3
-	Timer3_Init(9600, 7, 0, 2); // 初始化定时器3
+	Timer3_Init(9600, 8, 0, 1); // 初始化定时器3
 	// Uart_SendByte(0x04);
 	// Uart_SendByteStr("OK");
 	printf("Init Done\n");
