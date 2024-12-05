@@ -2,11 +2,15 @@
 #define __UART__H_
 #include "stm32f10x.h"
 #include "stm32f10x_usart.h"
-
+#include "stdio.h"
 void USART1_Config(void);
 void USART2_Config(void);
+void USART3_Config(void);
 void USART1_IRQHandler(void);
 void USART2_IRQHandler(void);
+void USART1_SendByte(uint16_t Data);
+void USART2_SendByte(uint16_t Data);
+void USART3_SendByte(uint16_t Data);
 void USART_SendByte(USART_TypeDef* USARTx,uint16_t Data);
 
 #ifndef LOG_EMERG
@@ -41,7 +45,7 @@ void USART_SendByte(USART_TypeDef* USARTx,uint16_t Data);
 #define	LOG_DEBUG	7	/* debug-level messages */
 #endif
 
-
+int GetLogLevel(void);
 #define LOG_LEVLE  (GetLogLevel())
 
 #define log_ printf
@@ -62,4 +66,7 @@ void USART_SendByte(USART_TypeDef* USARTx,uint16_t Data);
 		}\
 	}while(0)
 
+int USART1_SendStr(char *str,uint8_t len);
+void Uart_SendByteStr(char *str, int len);
+int USART2_SendStr(uint8_t *str,uint8_t len);
 #endif

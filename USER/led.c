@@ -1,5 +1,6 @@
 #include "stm32f10x.h"
 #include "led.h"
+#include "uart.h"
 
 /*******************************************************************************
  * Function Name : USART1_Config
@@ -51,18 +52,22 @@ void ShowGreenLed(void)
 	GPIO_SetBits(GPIOA, GPIO_Pin_5);
 	GPIO_ResetBits(GPIOA, GPIO_Pin_6);
 }
+// 打开远程指示灯
 void OpenRemoteLed(void)
 {
 	GPIO_ResetBits(GPIOA, GPIO_Pin_4);
 }
+// 关闭远程指示灯
 void CloseRemoteLed(void)
 {
 	GPIO_SetBits(GPIOA, GPIO_Pin_4);
 }
+// 打开电磁阀
 void OpenValve(void)
 {
 	GPIO_ResetBits(GPIOA, GPIO_Pin_7);
 }
+// 关闭电磁阀
 void CloseValve(void)
 {
 	GPIO_SetBits(GPIOA, GPIO_Pin_7);
@@ -121,8 +126,6 @@ void ADC_Configuration(void)
 	while (ADC_GetCalibrationStatus(ADC1))
 		;
 }
-#define ADC_Channel_0 0
-#define ADC_Channel_1 1
 
 uint16_t Get_ADC_Value(uint8_t channel)
 {
@@ -210,7 +213,7 @@ void updateBatteryInfo2UI(int batteryPower, uint8_t isCharging)
 	{
 		oldIsCharging = isCharging;
 		memset(tmpBuffer, 0, 128); // 控制充电动画
-		sprintf(tmpBuffer, "vis gm0,\" %d\"\xff\xff\xff", isCharging);
+		sprintf((char *)tmpBuffer, "vis gm0,\" %d\"\xff\xff\xff", isCharging);
 		USART1_SendStr(tmpBuffer, strlen(tmpBuffer));
 
 		memset(tmpBuffer, 0, 128); // 播放音乐

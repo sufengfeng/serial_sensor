@@ -1,28 +1,10 @@
 #include "usart_io.h"
-#include "stm32f10x.h"
-#include "stm32f10x_gpio.h"
-#include "stm32f10x_usart.h"
-#include "stm32f10x_exti.h"
 #include "uart.h"
+
 // 定义一些常量
 // #define BAUD_RATE 9600
 #define TIMER_PRESCALER 1
 // #define TIMER_PERIOD ((72000000 / TIMER_PRESCALER) / BAUD_RATE)
-// 定义校验模式枚举
-typedef enum
-{
-    NO_PARITY,  // 无校验
-    ODD_PARITY, // 奇校验
-    EVEN_PARITY // 偶校验
-} ParityMode;
-
-// 定义停止位模式枚举
-typedef enum
-{
-    None_STOP_BIT, // 无
-    ONE_STOP_BIT,  // 1位停止位
-    TWO_STOP_BITS  // 2位停止位
-} StopBitMode;
 
 volatile static ParityMode currentParityMode = NO_PARITY;      // 全局变量，用于设定当前校验模式
 volatile static StopBitMode currentStopBitMode = ONE_STOP_BIT; // 全局变量，用于设定当前停止位模式
@@ -38,10 +20,6 @@ extern uint8_t UART_IO_RxBuffer[128];
 extern uint8_t UART_IO_RxCount;
 extern uint8_t UART_IO_ReceiveState;
 
-void USART_GPIO_Init(void);
-void Uart_SendByte(uint8_t data);
-uint8_t Uart_ReceiveByte(void);
-void TIM3_IRQHandler(void);
 #define MAX_TIMER3_FILTER (5) // 每位需要定时器中断最大次数
 volatile static int l_nUartWordLength = 8;
 
@@ -62,9 +40,10 @@ void Timer3_Init(int BAUD_RATE, int USART_WordLength, int USART_Parity, int USAR
     if (USART_StopBits < 1 || USART_StopBits > 2)
     {
         USART_StopBits = 1;
-    }
-    currentParityMode = USART_Parity;    // 设置校验模式
-    currentStopBitMode = USART_StopBits; // 设置停止位模式
+    };
+
+    currentParityMode = (ParityMode)USART_Parity;     // 设置校验模式
+    currentStopBitMode = (StopBitMode)USART_StopBits; // 设置停止位模式
 
     l_nUartWordLength = USART_WordLength; // 设置有效位
     // 开启定时器 3 时钟
@@ -138,7 +117,7 @@ void USART_GPIO_Init(void)
         NVIC_Init(&NVIC_InitStructure);
     }
 }
-void Uart_SendByteStr(uint8_t *str, int len)
+void Uart_SendByteStr(char *str, int len)
 {
     for (int i = 0; i < len; i++)
     {
@@ -312,21 +291,21 @@ void SendTask(void)
     }
 }
 volatile static uint8_t bitIndex = 0; // 接收位计数
-//调整采样点
-// void AjustSamplingPoint(uint8_t *p_counter, uint8_t *p_lastValue)    // 调整定时器3的周期
-// {
-//     if (*p_counter >=3)
-//     {
-//          int nowValue= GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_10); // 读取当前GPIOA的第10位的状态
-//         if (*p_counter >=4 ){
-//             if (nowValue != *p_lastValue) // 如果当前GPIOA第10位的状态与上一次的状态不同
-//             {
-//                 *p_counter ++;    // 计数器加1
-//             }
-//         }
-//         *p_lastValue=nowValue; // 更新上一次的GPIOA第10位的状态
-//     }
-// }
+// 调整采样点
+//  void AjustSamplingPoint(uint8_t *p_counter, uint8_t *p_lastValue)    // 调整定时器3的周期
+//  {
+//      if (*p_counter >=3)
+//      {
+//           int nowValue= GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_10); // 读取当前GPIOA的第10位的状态
+//          if (*p_counter >=4 ){
+//              if (nowValue != *p_lastValue) // 如果当前GPIOA第10位的状态与上一次的状态不同
+//              {
+//                  *p_counter ++;    // 计数器加1
+//              }
+//          }
+//          *p_lastValue=nowValue; // 更新上一次的GPIOA第10位的状态
+//      }
+//  }
 /*
 ZZZZZZZZZZZZZZZ
 1234567890abcde
@@ -359,7 +338,7 @@ void ReceiveTask(void)
                     // 检测到起始位
                     bitIndex++;
                     busIdelCounter = 0;
-									memset(tmpValueArr,0,128);
+                    memset(tmpValueArr, 0, 128);
                 }
             }
             else
@@ -389,11 +368,11 @@ void ReceiveTask(void)
         {
             static uint8_t tmpValue = 0;
             static uint8_t counter = 0;
-            static uint8_t lastValue = 0;
+            // static uint8_t lastValue = 0;
             if (counter++ >= MAX_TIMER3_FILTER - 1)
             {
                 counter = 0;
-                lastValue=0;
+                // lastValue = 0;
                 {
                     receivedData >>= 1;
                     // tmpValue = GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_10);
@@ -407,29 +386,30 @@ void ReceiveTask(void)
                     {
                         parityCheck ^= (tmpValue & 0x01);
                     }
-										tmpValueArr[bitIndex]=receivedData;
+                    tmpValueArr[bitIndex] = receivedData;
                     bitIndex++;
-					tmpValue=0;
+                    tmpValue = 0;
                 }
             }
             if (counter == 3)
             { // 每5个时钟周期只在第3个时钟周期采样一次
                 tmpValue = GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_10);
             }
-            //AjustSamplingPoint(&counter,&lastValue);    // 调整采样点位置
+            // AjustSamplingPoint(&counter,&lastValue);    // 调整采样点位置
         }
         else if (bitIndex == l_nUartWordLength + 1) // 有无校验位
         {
             static uint8_t counter = 0;
             static uint8_t lastValue = 0;
-						if(receivedData==0x9A){
-							lastValue++;
-						}
-						lastValue=receivedData;
+            if (receivedData == 0x9A)
+            {
+                lastValue++;
+            }
+            lastValue = receivedData;
             if (counter++ >= MAX_TIMER3_FILTER - 1)
             {
                 counter = 0;
-                lastValue=0;
+                lastValue = 0;
 
                 {
                     if (currentParityMode != NO_PARITY)
@@ -458,17 +438,17 @@ void ReceiveTask(void)
 
                 receivedParityBit = GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_10);
             }
-            //AjustSamplingPoint(&counter,&lastValue);    // 调整采样点位置
+            // AjustSamplingPoint(&counter,&lastValue);    // 调整采样点位置
         }
         else if (bitIndex == l_nUartWordLength + (currentStopBitMode == ONE_STOP_BIT ? 2 : 3)) // 有无停止位
         {
             static uint8_t counter = 0;
-            static uint8_t lastValue = 0;
+            // static uint8_t lastValue = 0;
 
             if (counter++ >= MAX_TIMER3_FILTER - 1)
             {
                 counter = 0;
-                lastValue=0;
+                // lastValue = 0;
 
                 {
                     if (currentParityMode != NO_PARITY)
@@ -488,7 +468,7 @@ void ReceiveTask(void)
                             else
                             {
                                 // 校验失败，可以在这里添加相应错误处理逻辑，比如丢弃数据等
-                                LOG(LOG_CRIT, "\r\parityCheck  [%d][%d]\r\n", parityCheck, receivedParityBit);
+                                LOG(LOG_CRIT, "\r\nparityCheck  [%d][%d]\r\n", parityCheck, receivedParityBit);
                             }
                         }
                         else if (currentParityMode == ODD_PARITY)
@@ -506,7 +486,7 @@ void ReceiveTask(void)
                             else
                             {
                                 // 校验失败，可以在这里添加相应错误处理逻辑，比如丢弃数据等
-                                LOG(LOG_CRIT, "\r\parityCheck  [%d][%d][%d]\r\n", parityCheck, receivedParityBit, receivedData);
+                                LOG(LOG_CRIT, "\r\nparityCheck  [%d][%d][%d]\r\n", parityCheck, receivedParityBit, receivedData);
                             }
                         }
                         bitIndex = 0;
@@ -526,22 +506,22 @@ void ReceiveTask(void)
                     }
                 }
             }
-            //AjustSamplingPoint(&counter,&lastValue);    // 调整采样点位置
+            // AjustSamplingPoint(&counter,&lastValue);    // 调整采样点位置
         }
         else if (currentStopBitMode == TWO_STOP_BITS && bitIndex == l_nUartWordLength + 2)
         {
             static uint8_t counter = 0;
-            static uint8_t lastValue = 0;
+            // static uint8_t lastValue = 0;
             if (counter++ >= MAX_TIMER3_FILTER - 1)
             {
                 counter = 0;
-                lastValue=0;
+                // lastValue = 0;
                 {
                     // 等待第 2 位停止位，无实质操作，仅位计数增加
                     bitIndex++;
                 }
             }
-            //AjustSamplingPoint(&counter,&lastValue);    // 调整采样点位置
+            // AjustSamplingPoint(&counter,&lastValue);    // 调整采样点位置
         }
     }
     else
@@ -587,7 +567,7 @@ void ReceiveTask(void)
                     }
                     bitIndex = 0;
                     receiving = 1; // 接收完成，准备接收下一个数据
-			receivedData = 0;
+            receivedData = 0;
                         receivedParityBit = 0;
                         parityCheck = 0;
                 }
@@ -595,7 +575,7 @@ void ReceiveTask(void)
         }
         else if (bitIndex > 0 && bitIndex <= l_nUartWordLength)	// 接收数据位
         {
-            
+
             receivedData >>= 1;
             uint8_t tmpValue = 0;
             tmpValue = GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_10);
@@ -714,10 +694,10 @@ void TIM3_IRQHandler(void)
         {
             sendCounter = 0;
 #if DEBUG_SIMULATOR
-        TriggerBoardLed();
-#endif // 调用LED闪烁函数
+            TriggerBoardLed();
+#endif                  // 调用LED闪烁函数
             SendTask(); // 调用发送任务函数
-            //ReceiveTask(); // 调用接收任务函数
+            // ReceiveTask(); // 调用接收任务函数
         }
         ReceiveTask(); // 调用接收任务函数
 

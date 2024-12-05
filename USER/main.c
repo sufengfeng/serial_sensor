@@ -21,6 +21,8 @@ volatile uint8_t UART3_ReceiveState = 0;
 volatile uint8_t UART_IO_RxBuffer[128] = {0x00};
 volatile uint8_t UART_IO_RxCount = 0;
 volatile uint8_t UART_IO_ReceiveState = 0;
+int UpdateUiInit(void);
+int SendComandAutoZero(void);
 /*******************************************************************************
  * Function Name  : RCC_Config
  * Description    : 外设配置
@@ -292,13 +294,13 @@ void UART_IO_Frame_Handler(USART_TypeDef *USARTtype, volatile uint8_t buffer[], 
 	printf("[%s%d][%d]", __func__, __LINE__, len);
 	for (size_t i = 0; i < len; i++)
 	{
-		//printf("[0x%02x]", buffer[i]); // 打印接收到的数据
-		// 打印接收到的数据的所有位
-        for (int j = 7; j >= 0; j--)
-        {
-            printf("%d", (buffer[i] >> j) & 1);
-        }
-        printf(" ");
+		// printf("[0x%02x]", buffer[i]); // 打印接收到的数据
+		//  打印接收到的数据的所有位
+		for (int j = 7; j >= 0; j--)
+		{
+			printf("%d", (buffer[i] >> j) & 1);
+		}
+		printf(" ");
 	}
 	printf("\n");
 	if (!strncmp((const char *)buffer, PR_COMMAND_CLS, strlen(PR_COMMAND_CLS))) // 清屏
@@ -307,12 +309,12 @@ void UART_IO_Frame_Handler(USART_TypeDef *USARTtype, volatile uint8_t buffer[], 
 	}
 	else if (!strncmp((const char *)buffer, PR_COMMAND_LOCAL, strlen(PR_COMMAND_LOCAL))) // 设置为本地模式
 	{
-		Uart_SendByteStr(buffer, len);
+		Uart_SendByteStr((char *)buffer, len);
 	}
 	else if (!strncmp((const char *)buffer, PR_COMMAND_REMOTE, strlen(PR_COMMAND_REMOTE))) // 设置为远程模式
 	{
 		g_bFlageStatus = 1;
-		Uart_SendByteStr(buffer, len);
+		Uart_SendByteStr((char *)buffer, len);
 	}
 	else if (!strncmp((const char *)buffer, PR_COMMAND_AUTOZERO, strlen(PR_COMMAND_AUTOZERO))) // 自动校零
 	{
@@ -384,18 +386,21 @@ void UART1_Frame_Handler(USART_TypeDef *USARTtype, volatile uint8_t buffer[], vo
 	{
 		GlobalBasicParam *p_sGlobalBasicParam = (void *)GetBasicParamHandle();
 		char tmpBuffer[128];
-		sscanf((const char *)buffer, "BaudRate=%d;WordLength=%d;StopBits=%d;Parity=%s", &(p_sGlobalBasicParam->m_nBaudRate), &(p_sGlobalBasicParam->m_nWordLength), &(p_sGlobalBasicParam->m_nStopBits), tmpBuffer);
+		uint32_t tmpValue01, tmpValue02;
+		sscanf((const char *)buffer, "BaudRate=%d;WordLength=%d;StopBits=%d;Parity=%s", &(p_sGlobalBasicParam->m_nBaudRate), &(tmpValue01), &(tmpValue02), tmpBuffer);
+		p_sGlobalBasicParam->m_nWordLength = tmpValue01;
+		p_sGlobalBasicParam->m_nStopBits = tmpValue02;
 		if (!strncmp((const char *)tmpBuffer, "None", strlen("None")))
 		{
-			p_sGlobalBasicParam->m_nParity = enumNone;
+			p_sGlobalBasicParam->m_nParity = NO_PARITY;
 		}
 		else if (!strncmp((const char *)tmpBuffer, "Odd", strlen("Odd")))
 		{
-			p_sGlobalBasicParam->m_nParity = enumOdd;
+			p_sGlobalBasicParam->m_nParity = ODD_PARITY;
 		}
 		else
 		{
-			p_sGlobalBasicParam->m_nParity = enumEven;
+			p_sGlobalBasicParam->m_nParity = EVEN_PARITY;
 		}
 		PrintBasicParam(p_sGlobalBasicParam);
 	}
@@ -411,7 +416,7 @@ void UART1_Frame_Handler(USART_TypeDef *USARTtype, volatile uint8_t buffer[], vo
 		}
 		else
 		{
-			LOG(LOG_ERR, "stabLimVal error[%s]%d", buffer, tmpVal);
+			LOG(LOG_ERR, "stabLimVal error[%s]%f", buffer, tmpVal);
 		}
 	}
 	else if (!strncmp((const char *)buffer, "ValvalidDec", strlen("ValvalidDec"))) // BaudRate=9600;WordLength=8;StopBits=1;Parity=None
@@ -576,9 +581,9 @@ void Func_Task_100ms01(void)
 	ControlAutoZero();											  // 控制自动校零
 // Uart_SendByte('O');
 #if DEBUG_SIMULATOR
-	//Uart_SendByte(0x5A);
-	// Uart_SendByte(0x5B);
-	Uart_SendByteStr("777777777777777",sizeof("777777777777777"));
+	// Uart_SendByte(0x5A);
+	//  Uart_SendByte(0x5B);
+	Uart_SendByteStr("777777777777777", sizeof("777777777777777"));
 	// static uint8_t counter = 0;
 	// Uart_SendByte(counter); // 发送数据}
 	// counter++;
@@ -621,6 +626,7 @@ int UpdateUiPeriod(void)
 		sprintf(sendBuffer, tmpBuffer, g_fV_rate);
 	}
 	USART1_SendStr(sendBuffer, strlen(sendBuffer));
+	return 0;
 }
 // 周期更新数据到串口屏
 int UpdateUiInit(void)
@@ -641,11 +647,11 @@ int UpdateUiInit(void)
 	sprintf(sendBuffer, "com_setting.cb2.txt=\"%d\"\xff\xff\xff", p_sGlobalBasicParam->m_nStopBits); // 停止位
 	USART1_SendStr(sendBuffer, strlen(sendBuffer));
 
-	if (p_sGlobalBasicParam->m_nParity == enumNone)
+	if (p_sGlobalBasicParam->m_nParity == NO_PARITY)
 	{
 		sprintf(tmpBuffer, "None");
 	}
-	else if (p_sGlobalBasicParam->m_nParity == enumOdd)
+	else if (p_sGlobalBasicParam->m_nParity == ODD_PARITY)
 	{
 		sprintf(tmpBuffer, "Odd");
 	}
@@ -656,6 +662,7 @@ int UpdateUiInit(void)
 	memset(sendBuffer, 0, 128);
 	sprintf(sendBuffer, "com_setting.cb3.txt=\"%s\"\xff\xff\xff", tmpBuffer); // 奇偶校验
 	USART1_SendStr(sendBuffer, strlen(sendBuffer));
+	return 0;
 }
 void TriggerBoardLed(void)
 {
@@ -742,7 +749,7 @@ int maintest_getFormatString()
 	char *formatStr = getFormatString(decimalPlaces);
 	char sendBuffer[100]; // 根据实际可能的最长字符串长度合理设置缓冲区大小
 
-	sprintf(sendBuffer, "home_page0.t0.txt=\" %s\"\xff\xff\xff", formatStr, g_fV_psi);
+	sprintf(sendBuffer, "home_page0.t0.txt=\" %s\"\xff\xff\xff", formatStr);
 	printf(sendBuffer, g_fV_psi);
 
 	return 0;
@@ -751,7 +758,7 @@ int maintest_getFormatString()
 extern int main1(void);
 int main(void)
 {
-	uint8_t byte;
+	// uint8_t byte;
 	RCC_Config();
 	NVIC_Config();
 	BoardLED1_Config();
