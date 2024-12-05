@@ -213,7 +213,17 @@ void SetLogLevel(int level)
 		g_sGlobalBasicParam.m_nLogLevel = level;
 	}
 }
-
+// 单片机硬重启
+void Reboot(void)
+{
+	__disable_irq();
+	__set_FAULTMASK(1); // 关闭总中断
+	NVIC_SystemReset(); // 请求单片机重启
+	while (1)
+	{
+		;
+	}
+}
 GlobalBasicParam *GetBasicParamHandle(void)
 {
 	return (GlobalBasicParam *)&g_sGlobalBasicParam;
@@ -295,17 +305,7 @@ int LoadBasicParamFromFlash(GlobalBasicParam *p_sGlobalBasicParam)
 	return iRet;
 }
 
-// 单片机硬重启
-void Reboot(void)
-{
-	__disable_irq();
-	__set_FAULTMASK(1); // 关闭总中断
-	NVIC_SystemReset(); // 请求单片机重启
-	while (1)
-	{
-		;
-	}
-}
+
 
 // 输出功能安全相关参数配置
 void PrintBasicParam(GlobalBasicParam *p_sGlobalBasicParam)
@@ -321,3 +321,4 @@ void PrintBasicParam(GlobalBasicParam *p_sGlobalBasicParam)
 	// LOG(LOG_NOTICE,"Basic Param(%2d) m_nCanBaudRate =%d ", i++, (unsigned int )p_sGlobalBasicParam->m_nCanBaudRate);
 	//	LOG(LOG_NOTICE,"Basic Param(%2d) m_nManual =%d ", i++, (unsigned int )p_sGlobalBasicParam->m_nManual);
 }
+

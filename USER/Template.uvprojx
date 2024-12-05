@@ -339,7 +339,7 @@
               <MiscControls></MiscControls>
               <Define>STM32F10X_MD,USE_STDPERIPH_DRIVER</Define>
               <Undefine></Undefine>
-              <IncludePath>..\USER;..\CORE;..\STM32F10x_FWLib\inc;..\SYSTEM\delay;..\SYSTEM\sys;..\SYSTEM\usart;..\HAREWARE\LED</IncludePath>
+              <IncludePath>..\USER;..\CORE;..\STM32F10x_FWLib\inc;..\SYSTEM\delay;..\SYSTEM\sys;..\SYSTEM\usart;..\HAREWARE\LED;.\CLI;.\CLI\Install</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -576,6 +576,46 @@
         <Group>
           <GroupName>HAREWARE</GroupName>
         </Group>
+        <Group>
+          <GroupName>CLI</GroupName>
+          <Files>
+            <File>
+              <FileName>aasp_boot.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\CLI\aasp_boot.c</FilePath>
+            </File>
+            <File>
+              <FileName>aasp_cmd_help.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\CLI\aasp_cmd_help.c</FilePath>
+            </File>
+            <File>
+              <FileName>aasp_script.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\CLI\aasp_script.c</FilePath>
+            </File>
+            <File>
+              <FileName>aasp_shell.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\CLI\aasp_shell.c</FilePath>
+            </File>
+            <File>
+              <FileName>cli_product.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\CLI\cli_product.c</FilePath>
+            </File>
+            <File>
+              <FileName>common_cli.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\CLI\Install\common_cli.c</FilePath>
+            </File>
+            <File>
+              <FileName>ota_cli.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\CLI\Install\ota_cli.c</FilePath>
+            </File>
+          </Files>
+        </Group>
       </Groups>
     </Target>
   </Targets>
@@ -585,5 +625,14 @@
     <components/>
     <files/>
   </RTE>
+
+  <LayerInfo>
+    <Layers>
+      <Layer>
+        <LayName>Template</LayName>
+        <LayPrjMark>1</LayPrjMark>
+      </Layer>
+    </Layers>
+  </LayerInfo>
 
 </Project>

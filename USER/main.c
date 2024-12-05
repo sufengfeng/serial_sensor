@@ -6,6 +6,7 @@
 #include "stdio.h"
 #include "timer.h"
 #include "usart_io.h"
+#include "cli_api.h"
 volatile uint8_t UART1_RxBuffer[128] = {0x00};
 volatile uint8_t UART1_RxCount = 0;
 volatile uint8_t UART1_ReceiveState = 0;
@@ -574,6 +575,10 @@ void Func_Task_1ms01(void)
 void Func_Task_10ms01(void)
 {
 }
+//50ms回调事件
+void Func_Task_50ms01(void){	//忽略
+	aasp_shell_nos();				//命令行
+}
 // 100ms回调事件
 void Func_Task_100ms01(void)
 {
@@ -715,6 +720,7 @@ volatile SoftTimer g_sTimerArray[] = {
 	{0, 1, Func_Task_1ms01},
 	{5, 9, Func_Task_10ms01},
 	{37, 99, Func_Task_100ms01},
+	{23,49,Func_Task_50ms01},
 	{373, 999, Func_Task_1000ms01},
 };
 
@@ -792,6 +798,9 @@ int main(void)
 	LOG(LOG_CRIT, "\n\rCopyright (c) 2021,Geekplus All rights reserved.\n\rRelease SafePLC version=[0x%08lx] %s-%s\r\n", p_sGlobalBasicParam->m_nAppVersion, __DATE__, __TIME__);
 	// extern void Flash_Write_Read_Example(void) ;
 	// Flash_Write_Read_Example();
+	aasp_init();					//初始化命令行
+	plc_cli_install();			//安装命令行
+
 	while (1)
 	{
 		// 如果UART1接收到1帧数据
@@ -807,6 +816,14 @@ int main(void)
 			UART2_ReceiveState = 0;
 			UART2_Frame_Handler(USART2, UART2_RxBuffer, UART2_RxCount);
 			UART2_RxCount = 0;
+		}
+		// 如果UART3接收到1帧数据
+		if (UART3_ReceiveState == 1) // 传感器
+		{
+			UART3_ReceiveState = 0;
+			// UART3_Frame_Handler(USART3, UART3_RxBuffer, UART3_RxCount);
+			USART3_IRQHandler_Process((const char *)UART3_RxBuffer, UART3_RxCount);	//命令行
+			UART3_RxCount = 0;
 		}
 		// 如果UART2接收到1帧数据
 		if (UART_IO_ReceiveState == 1) // 外部IO

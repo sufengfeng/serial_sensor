@@ -36,9 +36,11 @@ typedef struct __GlobalBasicParam
 
 #define CONFIG_SYMBOL_BASE 		("BAS")			//基本配置参数头校验
 void PrintBasicParam(GlobalBasicParam*p_sGlobalBasicParam);
-void Reboot(void) ;
+void Reboot(void);
 
 int  SaveCurrentBasicParam(void);
 GlobalBasicParam *GetBasicParamHandle(void);
 int LoadBasicParamFromFlash(GlobalBasicParam *p_sGlobalBasicParam);
+void USART3_IRQHandler_Process(const char *Uart1RxBuffer, uint32_t len);
+void SetLogLevel(int level);
 #endif

@@ -288,7 +288,7 @@ void USART3_IRQHandler(void)
 		// 读DR寄存器(先读SR再读DR，就是为了清除IDLE中断)
 		Clear = USART3->DR;
 		// 标记接收到了1帧数据
-		UART2_ReceiveState = 1;
+		UART3_ReceiveState = 1;
 	}
 }
 
