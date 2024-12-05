@@ -288,7 +288,19 @@ void ReponceComandREAD(void)
  *******************************************************************************/
 void UART_IO_Frame_Handler(USART_TypeDef *USARTtype, volatile uint8_t buffer[], volatile uint8_t len)
 {
-	printf("[%s%d][%s][%d][%d]\n", __func__, __LINE__, buffer, len, buffer[0]);
+	// printf("[%s%d][%s][%d][%d]\n", __func__, __LINE__, buffer, len, buffer[0]);
+	printf("[%s%d][%d]", __func__, __LINE__, len);
+	for (size_t i = 0; i < len; i++)
+	{
+		//printf("[0x%02x]", buffer[i]); // 打印接收到的数据
+		// 打印接收到的数据的所有位
+        for (int j = 7; j >= 0; j--)
+        {
+            printf("%d", (buffer[i] >> j) & 1);
+        }
+        printf(" ");
+	}
+	printf("\n");
 	if (!strncmp((const char *)buffer, PR_COMMAND_CLS, strlen(PR_COMMAND_CLS))) // 清屏
 	{																			// 收到命令
 		Uart_SendByteStr(PR_RESPONE_OK, strlen(PR_RESPONE_OK));
@@ -564,11 +576,12 @@ void Func_Task_100ms01(void)
 	ControlAutoZero();											  // 控制自动校零
 // Uart_SendByte('O');
 #if DEBUG_SIMULATOR
-	// Uart_SendByte(0x5A);
+	//Uart_SendByte(0x5A);
 	// Uart_SendByte(0x5B);
-	static uint8_t counter = 0;
-	Uart_SendByte(counter); // 发送数据}
-	counter++;
+	Uart_SendByteStr("777777777777777",sizeof("777777777777777"));
+	// static uint8_t counter = 0;
+	// Uart_SendByte(counter); // 发送数据}
+	// counter++;
 #endif
 }
 int SendComandAutoZero(void)

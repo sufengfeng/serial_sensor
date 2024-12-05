@@ -214,7 +214,7 @@ void updateBatteryInfo2UI(int batteryPower, uint8_t isCharging)
 		USART1_SendStr(tmpBuffer, strlen(tmpBuffer));
 
 		memset(tmpBuffer, 0, 128); // ≤•∑≈“Ù¿÷
-		sprintf(tmpBuffer, "play 1,1,0\xff\xff\xff");
+		sprintf(tmpBuffer, "beep 100\xff\xff\xff");
 		USART1_SendStr(tmpBuffer, strlen(tmpBuffer));
 	}
 
