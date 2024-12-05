@@ -305,8 +305,6 @@ int LoadBasicParamFromFlash(GlobalBasicParam *p_sGlobalBasicParam)
 	return iRet;
 }
 
-
-
 // 输出功能安全相关参数配置
 void PrintBasicParam(GlobalBasicParam *p_sGlobalBasicParam)
 {
@@ -321,4 +319,9 @@ void PrintBasicParam(GlobalBasicParam *p_sGlobalBasicParam)
 	// LOG(LOG_NOTICE,"Basic Param(%2d) m_nCanBaudRate =%d ", i++, (unsigned int )p_sGlobalBasicParam->m_nCanBaudRate);
 	//	LOG(LOG_NOTICE,"Basic Param(%2d) m_nManual =%d ", i++, (unsigned int )p_sGlobalBasicParam->m_nManual);
 }
-
+uint32_t GetSoftVersion(const char *str)
+{
+	uint32_t hardVersion = 0, masterVersion = 0, FeatureVersion = 0;
+	sscanf(str, "%d.%d.%d", &hardVersion, &masterVersion, &FeatureVersion);
+	return (hardVersion << 24) + (masterVersion << 16) + FeatureVersion;
+}

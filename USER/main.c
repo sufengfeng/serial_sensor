@@ -782,20 +782,18 @@ int main(void)
 
 	USART3_SendByte(0x01); // 第一个字节发送异常
 
-	// USART3_SendByte(0x02);
-	// USART3_SendByte(0x03);
-
 	LoadBasicParamFromFlash(GetBasicParamHandle()); // 从Flash中读取基本参数
 	UpdateUiInit();									// 初始化串口屏UI
 
 	USART_GPIO_Init(); // 初始化串口GPIO
 	GlobalBasicParam *p_sGlobalBasicParam = (void *)GetBasicParamHandle();
+	p_sGlobalBasicParam->m_nAppVersion=GetSoftVersion(IMAGE_VER);
 	// Timer3_Init(p_sGlobalBasicParam->m_nBaudRate, p_sGlobalBasicParam->m_nWordLength,0,1); // 初始化定时器3
 	Timer3_Init(9600, 8, 0, 1); // 初始化定时器3
 	// Uart_SendByte(0x04);
 	// Uart_SendByteStr("OK");
 	printf("Init Done\n");
-	LOG(LOG_CRIT, "\n\rCopyright (c) 2021,Geekplus All rights reserved.\n\rRelease SafePLC version=[0x%08lx] %s-%s\r\n", p_sGlobalBasicParam->m_nAppVersion, __DATE__, __TIME__);
+	LOG(LOG_CRIT, "\n\rCopyright (c) 2024,Borui_Zhixin All rights reserved.\n\rRelease SafePLC version=[0x%08lx] %s-%s\r\n", p_sGlobalBasicParam->m_nAppVersion, __DATE__, __TIME__);
 	// extern void Flash_Write_Read_Example(void) ;
 	// Flash_Write_Read_Example();
 	aasp_init();					//初始化命令行

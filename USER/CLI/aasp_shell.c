@@ -495,7 +495,7 @@ void aasp_shell_nos(void)
 		iprintf("Geek_boot>");
 		#else
 					
-		iprintf("Geek_plus>");
+		iprintf("Borui_Zhixin>");
 		
 		
 		#endif

@@ -69,4 +69,6 @@ int GetLogLevel(void);
 int USART1_SendStr(char *str,uint8_t len);
 void Uart_SendByteStr(char *str, int len);
 int USART2_SendStr(uint8_t *str,uint8_t len);
+void Set485SendMode(void);
+void Set485ReceiveMode(void);
 #endif

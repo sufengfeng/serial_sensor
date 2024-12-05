@@ -9,6 +9,7 @@
 #include "string.h"
 
 #include "fifo.h"
+#define IMAGE_VER        "0.1.1"
 
 void TIM2_Config(void);
 void TIM2_IRQHandler(void);
@@ -43,4 +44,5 @@ GlobalBasicParam *GetBasicParamHandle(void);
 int LoadBasicParamFromFlash(GlobalBasicParam *p_sGlobalBasicParam);
 void USART3_IRQHandler_Process(const char *Uart1RxBuffer, uint32_t len);
 void SetLogLevel(int level);
+uint32_t GetSoftVersion(const char *str);
 #endif

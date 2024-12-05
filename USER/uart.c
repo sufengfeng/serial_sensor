@@ -166,10 +166,12 @@ void USART3_Config(void)
 	// 复位串口
 	USART_DeInit(USARTx);
 	// 配置485
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_15;
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_12;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
 	GPIO_Init(GPIOA, &GPIO_InitStructure);
+	Set485SendMode(); // 设置为发送模式
+
 	// 配置TXD
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
@@ -203,9 +205,17 @@ void USART3_Config(void)
 	}
 	// 初始化外设NVIC寄存器
 	NVIC_Init(&NVIC_InitStructure);
+	// 打开串口空闲中断 */
+	USART_ITConfig(USARTx, USART_IT_IDLE, ENABLE);
 	// 使能串口接收中断
 	USART_ITConfig(USARTx, USART_IT_RXNE, ENABLE);
 	USART_Cmd(USARTx, ENABLE);
+}
+void Set485SendMode(void){
+	GPIO_SetBits(GPIOA, GPIO_Pin_12);	// 485发送模式	
+}
+void Set485ReceiveMode(void){
+	GPIO_ResetBits(GPIOA, GPIO_Pin_12);	// 485接收模式
 }
 
 /*******************************************************************************
@@ -344,10 +354,12 @@ int USART2_SendStr(uint8_t *str, uint8_t len)
 *******************************************************************************/
 void USART3_SendByte(uint16_t Data)
 {
+	Set485SendMode	();
 	USART_TypeDef *USARTx = USART3;
 	USARTx->DR = (Data & (uint16_t)0x01FF);
 	while (USART_GetFlagStatus(USARTx, USART_FLAG_TC) != SET)
 		;
+	Set485ReceiveMode();
 }
 
 #include "stdio.h"
@@ -372,10 +384,12 @@ void _sys_exit(int x)
 
 int fputc(int ch, FILE *f)
 {
+	Set485SendMode	();
 	USART_TypeDef *USARTx = USART3;
 	USARTx->DR = (ch & (uint16_t)0x01FF);
 	while (USART_GetFlagStatus(USARTx, USART_FLAG_TC) != SET)
 		;
+	Set485ReceiveMode();	
 	return ch;
 }
 #endif
