@@ -10,6 +10,7 @@
 
 #include "fifo.h"
 #define IMAGE_VER        "0.1.1"
+// #define FIXED_SERIAL 0
 
 void TIM2_Config(void);
 void TIM2_IRQHandler(void);

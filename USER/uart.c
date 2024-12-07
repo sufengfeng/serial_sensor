@@ -31,35 +31,19 @@ void USART1_Config(void)
 	USART_ClearFlag(USARTx, USART_FLAG_TC);
 	// ¸´Î»´®¿Úx
 	USART_DeInit(USARTx);
-	// ÅäÖÃÖØÓ³Éä
-	GPIO_PinRemapConfig(GPIO_Remap_USART1, ENABLE);
+	// // ÅäÖÃÖØÓ³Éä
+	// GPIO_PinRemapConfig(GPIO_Remap_USART1, ENABLE);
 
-	// //ÅäÖÃTXD
-	// GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9;
-	// GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
-	// GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	// GPIO_Init(GPIOA,&GPIO_InitStructure);
-	// //ÅäÖÃTXD
-	// GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10;
-	// GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
-	// GPIO_Init(GPIOA,&GPIO_InitStructure);
-	/*	´ýÑéÖ¤*/
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6 | GPIO_Pin_7;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_Init(GPIOB, &GPIO_InitStructure);
-	GPIO_SetBits(GPIOB, GPIO_Pin_6);
-	GPIO_SetBits(GPIOB, GPIO_Pin_7);
-
-	// ÅäÖÃTXD
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6;
+	//ÅäÖÃTXD
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_Init(GPIOB, &GPIO_InitStructure);
-	// ÅäÖÃTXD
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_7;
+	GPIO_Init(GPIOA,&GPIO_InitStructure);
+	//ÅäÖÃTXD
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
-	GPIO_Init(GPIOB, &GPIO_InitStructure);
+	GPIO_Init(GPIOA,&GPIO_InitStructure);
+
 	// ÅäÖÃUSART
 	USART_ClockInitStructure.USART_Clock = USART_Clock_Disable;
 	USART_ClockInitStructure.USART_CPOL = USART_CPOL_Low;
@@ -360,6 +344,22 @@ void USART3_SendByte(uint16_t Data)
 	while (USART_GetFlagStatus(USARTx, USART_FLAG_TC) != SET)
 		;
 	Set485ReceiveMode();
+}
+
+int USART3_SendStr(char *str, uint8_t len)
+{
+	USART_TypeDef *USARTx = USART3;
+	Set485SendMode	();
+	while (*str != '\0')
+	{
+		uint16_t Data= *str++;
+		USARTx->DR = (Data & (uint16_t)0x01FF);
+		while (USART_GetFlagStatus(USARTx, USART_FLAG_TC) != SET)
+			;
+		USART1_SendByte(*str++);
+	}
+	Set485ReceiveMode();
+	return 0;
 }
 
 #include "stdio.h"
