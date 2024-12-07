@@ -291,25 +291,26 @@ void ReponceComandREAD(void)
  *******************************************************************************/
 void UART_IO_Frame_Handler(USART_TypeDef *USARTtype, volatile uint8_t buffer[], volatile uint8_t len)
 {
-	// printf("[%s%d][%s][%d][%d]\n", __func__, __LINE__, buffer, len, buffer[0]);
-	printf("[%s%d][%d]", __func__, __LINE__, len);
-	for (size_t i = 0; i < len; i++)
-	{
-		// printf("[0x%02x]", buffer[i]); // 打印接收到的数据
-		//  打印接收到的数据的所有位
-		for (int j = 7; j >= 0; j--)
-		{
-			printf("%d", (buffer[i] >> j) & 1);
-		}
-		printf(" ");
-	}
-	printf("\n");
+	printf("[%s%d][%s][%d][%d]\n", __func__, __LINE__, buffer, len, buffer[0]);
+	// printf("[%s%d][%d]", __func__, __LINE__, len);
+	// for (size_t i = 0; i < len; i++)
+	// {
+	// 	//  打印接收到的数据的所有位
+	// 	for (int j = 7; j >= 0; j--)
+	// 	{
+	// 		printf("%d", (buffer[i] >> j) & 1);
+	// 	}
+	// 	printf(" ");
+	// }
+	// printf("\n");
 	if (!strncmp((const char *)buffer, PR_COMMAND_CLS, strlen(PR_COMMAND_CLS))) // 清屏
-	{																			// 收到命令
+	{	
+		g_bFlageStatus = 1;																		// 收到命令
 		Uart_SendByteStr(PR_RESPONE_OK, strlen(PR_RESPONE_OK));
 	}
 	else if (!strncmp((const char *)buffer, PR_COMMAND_LOCAL, strlen(PR_COMMAND_LOCAL))) // 设置为本地模式
 	{
+		g_bFlageStatus = 1;
 		Uart_SendByteStr((char *)buffer, len);
 	}
 	else if (!strncmp((const char *)buffer, PR_COMMAND_REMOTE, strlen(PR_COMMAND_REMOTE))) // 设置为远程模式
@@ -319,48 +320,59 @@ void UART_IO_Frame_Handler(USART_TypeDef *USARTtype, volatile uint8_t buffer[], 
 	}
 	else if (!strncmp((const char *)buffer, PR_COMMAND_AUTOZERO, strlen(PR_COMMAND_AUTOZERO))) // 自动校零
 	{
-
+		g_bFlageStatus = 1;
 		g_bIsAutoZero = 1;
 		g_bIsAutoZeroReason = g_bIsAutoZeroReason | 0x20;
 	}
 	else if (!strncmp((const char *)buffer, PR_COMMAND_CONF1, strlen(PR_COMMAND_CONF1))) // 自动校零
 	{
+		g_bFlageStatus = 1;
 		Uart_SendByteStr(PR_RESPONE_OK, strlen(PR_RESPONE_OK));
 	}
 	else if (!strncmp((const char *)buffer, PR_COMMAND_RATE, strlen(PR_COMMAND_RATE))) // 查询采样率
 	{
+		g_bFlageStatus = 1;
 		char sendBuffer[128];
+		char tmpBuffer[128];
 		memset(sendBuffer, 0, 128);
-		sprintf(sendBuffer, "%f psi/s\r\n", g_fV_rate);
+		sprintf(tmpBuffer, "%s psi/s\r\n", getFormatString(g_nValiddecimal - 1));
+		sprintf(sendBuffer, tmpBuffer, g_fV_rate);
 		Uart_SendByteStr(sendBuffer, strlen(sendBuffer));
 	}
 	else if (!strncmp((const char *)buffer, PR_COMMAND_PR, strlen(PR_COMMAND_PR)))
 	{
+		g_bFlageStatus = 1;
 		ReponceComandPR();
 	}
 	else if (!strncmp((const char *)buffer, PR_COMMAND_PR_, strlen(PR_COMMAND_PR_)))
 	{
+		g_bFlageStatus = 1;
 		ReponceComandPR();
 	}
 	else if (!strncmp((const char *)buffer, PR_COMMAND_pr, strlen(PR_COMMAND_pr)))
 	{
+		g_bFlageStatus = 1;
 		ReponceComandPR();
 	}
 	else if (!strncmp((const char *)buffer, PR_COMMAND_pr_, strlen(PR_COMMAND_pr_)))
 	{
+		g_bFlageStatus = 1;
 		ReponceComandPR();
 	}
 
 	else if (!strncmp((const char *)buffer, PR_COMMAND_READ, strlen(PR_COMMAND_READ)))
 	{
+		g_bFlageStatus = 1;
 		ReponceComandPR();
 	}
 	else if (!strncmp((const char *)buffer, PR_COMMAND_READ1, strlen(PR_COMMAND_READ1)))
 	{
+		g_bFlageStatus = 1;
 		ReponceComandREAD();
 	}
 	else if (!strncmp((const char *)buffer, COMAND_COM1_SET, strlen(COMAND_COM1_SET)))
 	{
+		g_bFlageStatus = 1;
 		Uart_SendByteStr(COMAND_COM1_SET_RES, strlen(COMAND_COM1_SET_RES));
 	}
 	else
@@ -788,8 +800,8 @@ int main(void)
 	USART_GPIO_Init(); // 初始化串口GPIO
 	GlobalBasicParam *p_sGlobalBasicParam = (void *)GetBasicParamHandle();
 	p_sGlobalBasicParam->m_nAppVersion=GetSoftVersion(IMAGE_VER);
-	// Timer3_Init(p_sGlobalBasicParam->m_nBaudRate, p_sGlobalBasicParam->m_nWordLength,0,1); // 初始化定时器3
-	Timer3_Init(9600, 8, 0, 1); // 初始化定时器3
+	Timer3_Init(p_sGlobalBasicParam->m_nBaudRate, p_sGlobalBasicParam->m_nWordLength,p_sGlobalBasicParam->m_nParity,p_sGlobalBasicParam->m_nStopBits); // 初始化定时器3
+	// Timer3_Init(9600, 8, 0, 1); // 初始化定时器3
 	// Uart_SendByte(0x04);
 	// Uart_SendByteStr("OK");
 	printf("Init Done\n");

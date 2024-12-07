@@ -25,7 +25,7 @@ volatile static int l_nUartWordLength = 8;
 
 void Timer3_Init(int BAUD_RATE, int USART_WordLength, int USART_Parity, int USART_StopBits)
 {
-    if (BAUD_RATE < 4800 || BAUD_RATE > 115200)
+    if (BAUD_RATE < 2400 || BAUD_RATE > 115200)
     {
         BAUD_RATE = 9600;
     }
