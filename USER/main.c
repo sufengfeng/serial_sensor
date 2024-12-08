@@ -7,19 +7,20 @@
 #include "timer.h"
 #include "usart_io.h"
 #include "cli_api.h"
-volatile uint8_t UART1_RxBuffer[128] = {0x00};
+#define UART_RX_BUFFER_SIZE 128
+volatile uint8_t UART1_RxBuffer[UART_RX_BUFFER_SIZE] = {0x00};
 volatile uint8_t UART1_RxCount = 0;
 volatile uint8_t UART1_ReceiveState = 0;
 
-volatile uint8_t UART2_RxBuffer[128] = {0x00};
+volatile uint8_t UART2_RxBuffer[UART_RX_BUFFER_SIZE] = {0x00};
 volatile uint8_t UART2_RxCount = 0;
 volatile uint8_t UART2_ReceiveState = 0;
 
-volatile uint8_t UART3_RxBuffer[128] = {0x00};
+volatile uint8_t UART3_RxBuffer[UART_RX_BUFFER_SIZE] = {0x00};
 volatile uint8_t UART3_RxCount = 0;
 volatile uint8_t UART3_ReceiveState = 0;
 
-volatile uint8_t UART_IO_RxBuffer[128] = {0x00};
+volatile uint8_t UART_IO_RxBuffer[UART_RX_BUFFER_SIZE] = {0x00};
 volatile uint8_t UART_IO_RxCount = 0;
 volatile uint8_t UART_IO_ReceiveState = 0;
 int UpdateUiInit(void);
@@ -782,9 +783,15 @@ int main(void)
 	BoardLED1_Config();
 	BoardLED1_On();
 	ShowLedConfig();
-	USART1_Config();
 	USART2_Config();
 	USART3_Config();
+	GlobalBasicParam *p_sGlobalBasicParam = (void *)GetBasicParamHandle();
+	LoadBasicParamFromFlash(GetBasicParamHandle()); // 从Flash中读取基本参数
+	p_sGlobalBasicParam->m_nAppVersion=GetSoftVersion(IMAGE_VER);
+	USART1_Config(p_sGlobalBasicParam->m_nBaudRate, p_sGlobalBasicParam->m_nWordLength,p_sGlobalBasicParam->m_nParity,p_sGlobalBasicParam->m_nStopBits); // 初始化定时器3
+	//USART1_Config(2400, 7, 2, 1);
+	// USART1_Config(19200, 7, 0, 2);
+
 	TIM2_Config();		 // 1KHZ
 	ADC_Configuration(); // ADC初始化
 
@@ -794,14 +801,11 @@ int main(void)
 
 	USART3_SendByte(0x01); // 第一个字节发送异常
 
-	LoadBasicParamFromFlash(GetBasicParamHandle()); // 从Flash中读取基本参数
+
 	
 
 	USART_GPIO_Init(); // 初始化串口GPIO
-	GlobalBasicParam *p_sGlobalBasicParam = (void *)GetBasicParamHandle();
-	p_sGlobalBasicParam->m_nAppVersion=GetSoftVersion(IMAGE_VER);
-	// Timer3_Init(p_sGlobalBasicParam->m_nBaudRate, p_sGlobalBasicParam->m_nWordLength,p_sGlobalBasicParam->m_nParity,p_sGlobalBasicParam->m_nStopBits); // 初始化定时器3
-	Timer3_Init(115200, 8, 0, 1); // 初始化定时器3
+	Timer3_Init(); // 初始化定时器3
 	
 	UpdateUiInit();									// 初始化串口屏UI
 	// Uart_SendByte(0x04);

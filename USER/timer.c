@@ -313,7 +313,7 @@ void PrintBasicParam(GlobalBasicParam *p_sGlobalBasicParam)
 	LOG(LOG_NOTICE, "Basic Param(%2d) m_nBaudRate 	=%d ", i++, (unsigned int)p_sGlobalBasicParam->m_nBaudRate);
 	LOG(LOG_NOTICE, "Basic Param(%2d) m_nWordLength	=%d ", i++, (unsigned int)p_sGlobalBasicParam->m_nWordLength);
 	LOG(LOG_NOTICE, "Basic Param(%2d) m_nParity  	=%d ", i++, (unsigned int)p_sGlobalBasicParam->m_nParity);
-	LOG(LOG_NOTICE, "Basic Param(%2d) m_nStopBits 	=%d ", i++, (unsigned int)p_sGlobalBasicParam->m_nStopBits);
+	LOG(LOG_NOTICE, "Basic Param(%2d) m_nStopBits 	=%d ", i++, (unsigned int)p_sGlobalBasicParam->m_nStopBits+1);
 
 	// LOG(LOG_NOTICE,"Basic Param(%2d) m_nCanNodeID =%d ", i++, (unsigned int )p_sGlobalBasicParam->m_nCanNodeID);
 	// LOG(LOG_NOTICE,"Basic Param(%2d) m_nCanBaudRate =%d ", i++, (unsigned int )p_sGlobalBasicParam->m_nCanBaudRate);

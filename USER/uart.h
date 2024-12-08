@@ -3,7 +3,7 @@
 #include "stm32f10x.h"
 #include "stm32f10x_usart.h"
 #include "stdio.h"
-void USART1_Config(void);
+void USART1_Config(int BAUD_RATE, int USART_WordLength, int USART_Parity, int USART_StopBits);
 void USART2_Config(void);
 void USART3_Config(void);
 void USART1_IRQHandler(void);
