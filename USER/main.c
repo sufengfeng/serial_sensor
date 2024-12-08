@@ -217,8 +217,21 @@ void UART2_Frame_Handler(USART_TypeDef *USARTtype, volatile uint8_t buffer[], vo
 		float tmpValue = 0;
 		sscanf((const char *)buffer, "!rp=%f", &tmpValue);
 		g_fV_mbar = sliding_window_filter(tmpValue);
-		// g_fV_mbar = sliding_window_filter_max_min(tmpValue);
-		// printf("[%s%d][%f]\n", __func__, __LINE__, g_fV_mbar);
+	}
+	else if (strncmp((const char *)buffer, ":SENS:PRES", strlen(":SENS:PRES")) <= 0)
+	{
+		float tmpValue = 0;
+		int iRet = 0;
+		iRet = sscanf((const char *)buffer, ":SENS:PRES:SLEW %f", &tmpValue);
+		if (iRet > 0)
+		{
+			g_fV_rate = tmpValue;
+		}
+		iRet = sscanf((const char *)buffer, ":SENS:PRES %f", &tmpValue);
+		if (iRet > 0)
+		{
+			g_fV_psi = tmpValue;
+		}
 	}
 }
 
@@ -305,8 +318,8 @@ void HandleOutsideCommand(USART_TypeDef *USARTtype, volatile uint8_t buffer[], v
 	// }
 	// printf("\n");
 	if (!strncmp((const char *)buffer, PR_COMMAND_CLS, strlen(PR_COMMAND_CLS))) // 清屏
-	{	
-		g_bFlageStatus = 1;																		// 收到命令
+	{
+		g_bFlageStatus = 1; // 收到命令
 		USART1_SendStr(PR_RESPONE_OK, strlen(PR_RESPONE_OK));
 	}
 	else if (!strncmp((const char *)buffer, PR_COMMAND_LOCAL, strlen(PR_COMMAND_LOCAL))) // 设置为本地模式
@@ -548,6 +561,7 @@ void ControlAutoZero(void) // 控制自动校零
 			}
 			else
 			{
+				USART1_SendStr(PR_RESPONE_OK, strlen(PR_RESPONE_OK)); // 发送校零命令响应
 				printf("[%s][%d]AutoZero Done!!\n", __func__, __LINE__);
 			}
 			g_bIsAutoZeroReason = 0;
@@ -588,20 +602,40 @@ void Func_Task_1ms01(void)
 void Func_Task_10ms01(void)
 {
 }
-//50ms回调事件
-void Func_Task_50ms01(void){	//忽略
-	aasp_shell_nos();				//命令行
+// 50ms回调事件
+void Func_Task_50ms01(void)
+{					  // 忽略
+	aasp_shell_nos(); // 命令行
 }
+#define COMMAND_SENS ":SENS?\r\n"			 // 查询压力值
+#define COMMAND_SENS_SLEW ":SENSe:SLEW?\r\n" // 查询压力值变化率
+
 // 100ms回调事件
 void Func_Task_100ms01(void)
 {
+#if PROJ_TYPE == PROJ_PACE1004
+	static uint8_t flag = 0;
+	if (flag == 0)
+	{
+		flag = 1;
+		USART2_SendStr(COMMAND_SENS, strlen(COMMAND_SENS)); // 发送查询命令
+	}
+	else
+
+	{
+		flag = 0;
+		USART2_SendStr(COMMAND_SENS_SLEW, strlen(COMMAND_SENS_SLEW)); // 发送查询辩护率命令
+	}
+#else
 	USART2_SendStr(SENSOR_COMMAND_RP, strlen(SENSOR_COMMAND_RP)); // 发送查询命令
-	ControlAutoZero();											  // 控制自动校零
+#endif
+
+	ControlAutoZero(); // 控制自动校零
 // Uart_SendByte('O');
 #if DEBUG_SIMULATOR
 	Uart_IO_SendByte(0x5A);
 	//  Uart_SendByte(0x5B);
-	//USART1_SendStr("777777777777777", sizeof("777777777777777"));
+	// USART1_SendStr("777777777777777", sizeof("777777777777777"));
 	// static uint8_t counter = 0;
 	// Uart_SendByte(counter); // 发送数据}
 	// counter++;
@@ -702,7 +736,11 @@ void Func_Task_1000ms01(void)
 #if DEBUG_SIMULATOR == 0
 	TriggerBoardLed();
 #endif
-	UpdateUiPeriod();			  // 周期更新数据到串口屏
+#if PROJ_TYPE == PROJ_PACE1004
+#else
+
+	UpdateUiPeriod(); // 周期更新数据到串口屏
+#endif
 	ControlShowLed();			  // 控制气体是否稳定显示灯
 	ControlRemoteStatue();		  // 远程控制状态显示
 	static uint8_t counter3s = 0; // 3s计数器
@@ -733,7 +771,7 @@ volatile SoftTimer g_sTimerArray[] = {
 	{0, 1, Func_Task_1ms01},
 	{5, 9, Func_Task_10ms01},
 	{37, 99, Func_Task_100ms01},
-	{23,49,Func_Task_50ms01},
+	{23, 49, Func_Task_50ms01},
 	{373, 999, Func_Task_1000ms01},
 };
 
@@ -746,7 +784,6 @@ void UpdataSoftTimer(void)
 		g_sTimerArray[i].m_nCounter++;
 	}
 }
-
 // 定时器任务调度
 void TaskSchedule(void)
 {
@@ -787,11 +824,13 @@ int main(void)
 	USART3_Config();
 	GlobalBasicParam *p_sGlobalBasicParam = (void *)GetBasicParamHandle();
 	LoadBasicParamFromFlash(GetBasicParamHandle()); // 从Flash中读取基本参数
-	p_sGlobalBasicParam->m_nAppVersion=GetSoftVersion(IMAGE_VER);
-	USART1_Config(p_sGlobalBasicParam->m_nBaudRate, p_sGlobalBasicParam->m_nWordLength,p_sGlobalBasicParam->m_nParity,p_sGlobalBasicParam->m_nStopBits); // 初始化定时器3
-	//USART1_Config(2400, 7, 2, 1);
-	// USART1_Config(19200, 7, 0, 2);
-
+	p_sGlobalBasicParam->m_nAppVersion = GetSoftVersion(IMAGE_VER);
+#if PROJ_TYPE == PROJ_PACE1004
+	USART1_Config(2400, 7, 2, 1);
+ 	//USART1_Config(19200, 7, 0, 2);
+#else
+	USART1_Config(p_sGlobalBasicParam->m_nBaudRate, p_sGlobalBasicParam->m_nWordLength, p_sGlobalBasicParam->m_nParity, p_sGlobalBasicParam->m_nStopBits); // 初始化定时器3
+#endif
 	TIM2_Config();		 // 1KHZ
 	ADC_Configuration(); // ADC初始化
 
@@ -801,21 +840,18 @@ int main(void)
 
 	USART3_SendByte(0x01); // 第一个字节发送异常
 
-
-	
-
 	USART_GPIO_Init(); // 初始化串口GPIO
-	Timer3_Init(); // 初始化定时器3
-	
-	UpdateUiInit();									// 初始化串口屏UI
+	Timer3_Init();	   // 初始化定时器3
+
+	UpdateUiInit(); // 初始化串口屏UI
 	// Uart_SendByte(0x04);
 	// USART1_SendStr("OK");
 	printf("Init Done\n");
 	LOG(LOG_CRIT, "\n\rCopyright (c) 2024,Borui_Zhixin All rights reserved.\n\rRelease SafePLC version=[0x%08lx] %s-%s\r\n", p_sGlobalBasicParam->m_nAppVersion, __DATE__, __TIME__);
 	// extern void Flash_Write_Read_Example(void) ;
 	// Flash_Write_Read_Example();
-	aasp_init();					//初始化命令行
-	plc_cli_install();			//安装命令行
+	aasp_init();	   // 初始化命令行
+	plc_cli_install(); // 安装命令行
 
 	while (1)
 	{
@@ -834,19 +870,18 @@ int main(void)
 			UART2_RxCount = 0;
 		}
 		// 如果UART3接收到1帧数据
-		if (UART3_ReceiveState == 1) //485调试串口
+		if (UART3_ReceiveState == 1) // 485调试串口
 		{
-			USART3_IRQHandler_Process((const char *)UART3_RxBuffer, UART3_RxCount);	//命令行
+			USART3_IRQHandler_Process((const char *)UART3_RxBuffer, UART3_RxCount); // 命令行
 			UART3_ReceiveState = 0;
 			UART3_RxCount = 0;
 		}
 		// 如果UART2接收到1帧数据
 		if (UART_IO_ReceiveState == 1) // 外部IO
 		{
-			HandleUartShow(NULL, UART_IO_RxBuffer, UART_IO_RxCount);	//处理串口屏数据
+			HandleUartShow(NULL, UART_IO_RxBuffer, UART_IO_RxCount); // 处理串口屏数据
 			UART_IO_ReceiveState = 0;
 			UART_IO_RxCount = 0;
-			
 		}
 		TaskSchedule();
 	}

@@ -19,16 +19,19 @@ volatile static StopBitMode l_sStopBitMode = ONE_STOP_BIT; // 全局变量，用于设定
 volatile static int l_nUartWordLength = 8;
 
 // 函数用于校验并设置数值
-int checkAndSetRate(int rate) {
-    int validRates[] = {2400, 4800, 9600, 14400, 19200, 38400, 57600, 115200};
-    int i;
-    for (i = 0; i < sizeof(validRates) / sizeof(validRates[0]); i++) {
-        if (rate == validRates[i]) {
-            return rate;
-        }
-    }
-	LOG(LOG_ERR,"Invalid baud rate, using default 115200\n");
-    return 115200;
+int checkAndSetRate(int rate)
+{
+	int validRates[] = {2400, 4800, 9600, 14400, 19200, 38400, 57600, 115200};
+	int i;
+	for (i = 0; i < sizeof(validRates) / sizeof(validRates[0]); i++)
+	{
+		if (rate == validRates[i])
+		{
+			return rate;
+		}
+	}
+	LOG(LOG_ERR, "Invalid baud rate, using default 115200\n");
+	return 115200;
 }
 
 /*******************************************************************************
@@ -42,20 +45,26 @@ void USART1_Config(int BAUD_RATE, int USART_WordLength, int USART_Parity, int US
 	if (USART_WordLength < 7 || USART_WordLength > 9)
 	{
 		USART_WordLength = 8;
-	}else{
-		LOG(LOG_ERR,"Invalid USART_WordLength, using default 8\n");	
+	}
+	else
+	{
+		LOG(LOG_ERR, "Invalid USART_WordLength, using default 8\n");
 	}
 	if (USART_Parity < NO_PARITY || USART_Parity > EVEN_PARITY)
 	{
 		USART_Parity = NO_PARITY;
-	}else{
-		LOG(LOG_ERR,"Invalid USART_Parity, using default NO_PARITY\n");
+	}
+	else
+	{
+		LOG(LOG_ERR, "Invalid USART_Parity, using default NO_PARITY\n");
 	}
 	if (USART_StopBits < ONE_STOP_BIT || USART_StopBits > TWO_STOP_BITS)
 	{
 		USART_StopBits = ONE_STOP_BIT;
-	}else{
-		LOG(LOG_ERR,"Invalid USART_StopBits, using default ONE_STOP_BIT\n");
+	}
+	else
+	{
+		LOG(LOG_ERR, "Invalid USART_StopBits, using default ONE_STOP_BIT\n");
 	}
 
 	l_nUartWordLength = USART_WordLength;		  // 设置有效位
@@ -96,12 +105,12 @@ void USART1_Config(int BAUD_RATE, int USART_WordLength, int USART_Parity, int US
 	USART_InitStructure.USART_WordLength = USART_WordLength_8b;
 	if (l_nUartWordLength == 7)
 	{
-		//7 N 1		8 N 0.5
-		//7 N 2		8 N 1
-		//7 O 1		8 N 1
-		//7 O 2		8 N 2
-		//7 E 1		8 N 1
-		//7 E 2		8 N 2
+		// 7 N 1		8 N 0.5
+		// 7 N 2		8 N 1
+		// 7 O 1		8 N 1
+		// 7 O 2		8 N 2
+		// 7 E 1		8 N 1
+		// 7 E 2		8 N 2
 		if (l_sParityMode == NO_PARITY)
 		{
 			USART_InitStructure.USART_Parity = USART_Parity_No;
@@ -109,7 +118,9 @@ void USART1_Config(int BAUD_RATE, int USART_WordLength, int USART_Parity, int US
 			if (l_sStopBitMode == ONE_STOP_BIT)
 			{
 				USART_InitStructure.USART_StopBits = USART_StopBits_0_5;
-			}else	{
+			}
+			else
+			{
 				USART_InitStructure.USART_StopBits = USART_StopBits_1;
 			}
 		}
@@ -129,13 +140,13 @@ void USART1_Config(int BAUD_RATE, int USART_WordLength, int USART_Parity, int US
 	}
 	else
 	{
-		//8 N 1		8 N 1
-		//8 N 2		8 N 2
-		//8 O 1		8 O 1
-		//8 O 2		8 O 2
-		//8 E 1		8 E 1
-		//8 E 2		8 E 2
-		// 配置校验位
+		// 8 N 1		8 N 1
+		// 8 N 2		8 N 2
+		// 8 O 1		8 O 1
+		// 8 O 2		8 O 2
+		// 8 E 1		8 E 1
+		// 8 E 2		8 E 2
+		//  配置校验位
 		if (l_sParityMode == NO_PARITY)
 		{
 			USART_InitStructure.USART_Parity = USART_Parity_No;
@@ -158,12 +169,12 @@ void USART1_Config(int BAUD_RATE, int USART_WordLength, int USART_Parity, int US
 		{
 			USART_InitStructure.USART_StopBits = USART_StopBits_2;
 		}
-		//9 N 1		9 N 1
-		//9 N 2		9 N 2
-		//9 O 1		9 O 1
-		//9 O 2		9 O 2
-		//9 E 1		9 E 1
-		//9 E 2		9 E 2
+		// 9 N 1		9 N 1
+		// 9 N 2		9 N 2
+		// 9 O 1		9 O 1
+		// 9 O 2		9 O 2
+		// 9 E 1		9 E 1
+		// 9 E 2		9 E 2
 		if (l_nUartWordLength == 9)
 		{
 			USART_InitStructure.USART_WordLength = USART_WordLength_9b;
@@ -222,7 +233,11 @@ void USART2_Config(void)
 	USART_ClockInitStructure.USART_CPHA = USART_CPHA_2Edge;
 	USART_ClockInitStructure.USART_LastBit = USART_LastBit_Disable;
 	USART_ClockInit(USARTx, &USART_ClockInitStructure);
+	#if PROJ_TYPE == PROJ_PACE1004
+	USART_InitStructure.USART_BaudRate = 9600;
+	#else
 	USART_InitStructure.USART_BaudRate = 19200;
+	#endif
 	USART_InitStructure.USART_WordLength = USART_WordLength_8b;
 	USART_InitStructure.USART_StopBits = USART_StopBits_1;
 	USART_InitStructure.USART_Parity = USART_Parity_No;
@@ -333,7 +348,8 @@ void USART1_IRQHandler(void)
 	if (USART_GetITStatus(USART1, USART_IT_RXNE) != RESET)
 	{
 		uint8_t tmpValue = USART1->DR;
-		if(l_nUartWordLength == 7){		// 如果是7位数据，那么只取低7位数据
+		if (l_nUartWordLength == 7)
+		{ // 如果是7位数据，那么只取低7位数据
 			tmpValue &= 0x7F;
 		}
 		// 把接收到的字节保存，数组地址加1
@@ -408,32 +424,37 @@ void USART3_IRQHandler(void)
 }
 
 // 函数用于计算并设置奇偶校验位
-unsigned char setParityBit(unsigned char Data,ParityMode checkMode) {
-    unsigned char last7Bits = Data & 0x7F;  // 获取Data的最后7位
-    unsigned char parityBit = 0;
-    // 计算最后7位中1的个数
-    for (int i = 0; i < 7; i++) {
-        parityBit ^= (last7Bits >> i) & 0x01;
-    }
+unsigned char setParityBit(unsigned char Data, ParityMode checkMode)
+{
+	unsigned char last7Bits = Data & 0x7F; // 获取Data的最后7位
+	unsigned char parityBit = 0;
+	// 计算最后7位中1的个数
+	for (int i = 0; i < 7; i++)
+	{
+		parityBit ^= (last7Bits >> i) & 0x01;
+	}
 
-    switch (checkMode) {
-    case NO_PARITY:
-        break;
-    case ODD_PARITY:
-        if (parityBit == 0) {
-            parityBit = 1;
-        }
-        break;
-    case EVEN_PARITY:
-        if (parityBit == 1) {
-            parityBit = 0;
-        }
-        break;
-    }
+	switch (checkMode)
+	{
+	case NO_PARITY:
+		break;
+	case ODD_PARITY:
+		if (parityBit == 0)
+		{
+			parityBit = 1;
+		}
+		break;
+	case EVEN_PARITY:
+		if (parityBit == 1)
+		{
+			parityBit = 0;
+		}
+		break;
+	}
 
-    Data &= 0x7F;  // 先清除原来的最高位（假设原来最高位可能有值）
-    Data |= (parityBit << 7);  // 将奇偶校验位放到最高位
-    return Data;
+	Data &= 0x7F;			  // 先清除原来的最高位（假设原来最高位可能有值）
+	Data |= (parityBit << 7); // 将奇偶校验位放到最高位
+	return Data;
 }
 
 /*******************************************************************************
@@ -444,8 +465,9 @@ unsigned char setParityBit(unsigned char Data,ParityMode checkMode) {
 *******************************************************************************/
 void USART1_SendByte(uint16_t Data)
 {
-	if(l_nUartWordLength == 7){		// 如果是7位数据，那么只取低7位数据
-		Data=setParityBit((unsigned char )Data,l_sParityMode);
+	if (l_nUartWordLength == 7)
+	{ // 如果是7位数据，那么只取低7位数据
+		Data = setParityBit((unsigned char)Data, l_sParityMode);
 	}
 	USART_TypeDef *USARTx = USART1;
 	USARTx->DR = (Data & (uint16_t)0x01FF);

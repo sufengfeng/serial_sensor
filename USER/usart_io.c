@@ -17,11 +17,6 @@ extern uint8_t UART_IO_RxBuffer[128];
 extern uint8_t UART_IO_RxCount;
 extern uint8_t UART_IO_ReceiveState;
 
-uint8_t recvStat = COM_STOP_BIT; // 定义状态机
-
-// #define MAX_TIMER3_FILTER (5) // 每位需要定时器中断最大次数
-
-
 // 全局定义的固定内存地址的循环队列实例
 CircularQueue fixedQueue;
 
@@ -85,7 +80,7 @@ int maintest()
 }
 void Timer3_Init(void)
 {
-    InitCircularQueue();                              // 初始化循环队列
+    InitCircularQueue(); // 初始化循环队列
 
     // 开启定时器 3 时钟
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
@@ -308,7 +303,7 @@ void ReceiveTask(void)
             // 检测到停止位
             UART_IO_RxBuffer[UART_IO_RxCount++] = receivedData;
             bitIndex = 0;
-            receivedData= 0;
+            receivedData = 0;
         }
     }
     // else
@@ -500,12 +495,11 @@ void EXTI9_5_IRQHandler(void)
 {
     if (EXTI_GetITStatus(EXTI_Line7) != RESET)
     {
-        if (receiving == 0 && recvStat == COM_STOP_BIT) // 判断是否是接收状态，如果reciver=0，且bitIndex=0，则设置receive为1
+        if (receiving == 0) // 判断是否是接收状态，如果reciver=0，且bitIndex=0，则设置receive为1
         {
             receiving = 1;
-            // recvStat = COM_START_BIT;
-            if (sending == 0)
-            { // 如果是未发送状态，则调整定时器
+            if (sending == 0) // 如果是未发送状态，则调整定时器
+            {
                 // TIM_Cmd(TIM3, DISABLE);     // 关闭定时器
                 TIM_SetCounter(TIM3, 300); // 在中间位置采样
                 // TIM_Cmd(TIM3, ENABLE);      // 打开定时器，接收数据
