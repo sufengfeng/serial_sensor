@@ -85,8 +85,8 @@ void Timer3_Init(void)
     // 开启定时器 3 时钟
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
     TIM_Cmd(TIM3, DISABLE); // 关闭定时器，防止冲突
-    // int TIMER_PERIOD = (72000000 / 115200);
-    int TIMER_PERIOD = 625;
+    // uint16_t TIMER_PERIOD = (72000000 / 9600);
+    uint16_t TIMER_PERIOD = 7500;
     TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
     TIM_TimeBaseStructure.TIM_Period = TIMER_PERIOD - 1;
     TIM_TimeBaseStructure.TIM_Prescaler = TIMER_PRESCALER - 1;
@@ -109,6 +109,37 @@ void Timer3_Init(void)
     UART_IO_ReceiveState = 0;
     // 启动定时器
     TIM_Cmd(TIM3, ENABLE);
+}
+
+void Timer4_Init(void)
+{
+    // 开启定时器 4 时钟
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM4, ENABLE);
+    TIM_Cmd(TIM4, DISABLE); // 关闭定时器，防止冲突
+    // int TIMER_PERIOD = (72000000 / 115200);
+    int TIMER_PERIOD = 625;
+    TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
+    TIM_TimeBaseStructure.TIM_Period = TIMER_PERIOD - 1;
+    TIM_TimeBaseStructure.TIM_Prescaler = TIMER_PRESCALER - 1;
+    TIM_TimeBaseStructure.TIM_ClockDivision = 0;
+    TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
+    TIM_TimeBaseInit(TIM4, &TIM_TimeBaseStructure);
+
+    // 开启定时器中断
+    TIM_ITConfig(TIM4, TIM_IT_Update, ENABLE);
+
+    // 配置 NVIC，使能定时器中断
+    NVIC_InitTypeDef NVIC_InitStructure;
+    NVIC_InitStructure.NVIC_IRQChannel = TIM4_IRQn;
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_Init(&NVIC_InitStructure);
+    // sendIndex = 0;
+    UART_IO_RxCount = 0;
+    UART_IO_ReceiveState = 0;
+    // 启动定时器
+    TIM_Cmd(TIM4, ENABLE);
 }
 
 void USART_GPIO_Init(void)
@@ -175,14 +206,21 @@ void Uart_IO_SendByte(uint8_t data)
 {
     enqueue(data);
     sending = 1;
+    /*if (sending == 0) // 如果是未发送也未接收状态，则调整定时器
+    {
+        TIM_Cmd(TIM3, DISABLE);  // 关闭定时器
+        TIM_SetCounter(TIM3, 0); // 在中间位置采样
+        TIM_Cmd(TIM3, ENABLE);   // 打开定时器，接收数据
+    }
+    */
 }
 // 定时器3中断处理函数，发送任务
 void SendTask(void)
 {
-    // if (GetDequeueSize() > 0)
-    // {
-    //     sending = 1;
-    // }
+    if (GetDequeueSize() > 0)
+    {
+        sending = 1;
+    }
     if (sending)
     {
         volatile static uint8_t dataToSend;
@@ -479,12 +517,12 @@ void TIM3_IRQHandler(void)
         TIM_ClearITPendingBit(TIM3, TIM_IT_Update);
     }
 }
-// void Delay(u32 t)
 
-// {
-//     while (t--)
-//         ;
-// }
+void Delay(uint32_t t)
+{
+    while (t--)
+        ;
+}
 
 // 接受完进行一个确定的延时，开启定时器中断
 
@@ -497,13 +535,14 @@ void EXTI9_5_IRQHandler(void)
     {
         if (receiving == 0) // 判断是否是接收状态，如果reciver=0，且bitIndex=0，则设置receive为1
         {
+            // Delay(200);
             receiving = 1;
-            if (sending == 0) // 如果是未发送状态，则调整定时器
-            {
-                // TIM_Cmd(TIM3, DISABLE);     // 关闭定时器
-                TIM_SetCounter(TIM3, 300); // 在中间位置采样
-                // TIM_Cmd(TIM3, ENABLE);      // 打开定时器，接收数据
-            }
+            // if (sending == 0) // 如果是未发送状态，则调整定时器
+            // {
+            //     TIM_Cmd(TIM3, DISABLE);    // 关闭定时器
+            //     TIM_SetCounter(TIM3, 300); // 在中间位置采样
+            //     TIM_Cmd(TIM3, ENABLE);     // 打开定时器，接收数据
+            // }
         }
         // 清除中断标志位，避免重复进入中断（非常重要的操作）
         EXTI_ClearITPendingBit(EXTI_Line7);

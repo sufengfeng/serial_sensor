@@ -44,16 +44,16 @@ typedef struct CircularQueue
 // 定义校验模式枚举
 typedef enum
 {
-    NO_PARITY,  // 无校验
-    ODD_PARITY, // 奇校验
-    EVEN_PARITY // 偶校验
+    NO_PARITY = 0,  // 无校验
+    ODD_PARITY = 1, // 奇校验
+    EVEN_PARITY = 2 // 偶校验
 } ParityMode;
 
 // 定义停止位模式枚举
 typedef enum
 {
-    ONE_STOP_BIT, // 1位停止位
-    TWO_STOP_BITS // 2位停止位
+    ONE_STOP_BIT = 1, // 1位停止位
+    TWO_STOP_BITS = 2 // 2位停止位
 } StopBitMode;
 
 void USART_GPIO_Init(void); // 初始化GPIO

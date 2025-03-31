@@ -205,7 +205,7 @@ int Get_Battery_Power(float voltagePA0)
 // 更新UI显示电池电量及充电状态
 void updateBatteryInfo2UI(int batteryPower, uint8_t isCharging)
 {
-	char tmpBuffer[128];
+	uint8_t tmpBuffer[128];
 	static uint8_t oldIsCharging = 1;
 	static uint8_t oldBatteryPower = 1;
 
@@ -214,22 +214,22 @@ void updateBatteryInfo2UI(int batteryPower, uint8_t isCharging)
 		oldIsCharging = isCharging;
 		memset(tmpBuffer, 0, 128); // 控制充电动画
 		sprintf((char *)tmpBuffer, "vis gm0,\" %d\"\xff\xff\xff", isCharging);
-		USART1_SendStr(tmpBuffer, strlen(tmpBuffer));
+		USART1_SendStr(tmpBuffer, strlen((const char *)tmpBuffer));
 
 		memset(tmpBuffer, 0, 128); // 播放音乐
-		sprintf(tmpBuffer, "beep 100\xff\xff\xff");
-		USART1_SendStr(tmpBuffer, strlen(tmpBuffer));
+		sprintf((char *)tmpBuffer, "beep 100\xff\xff\xff");
+		USART1_SendStr(tmpBuffer, strlen((const char *)tmpBuffer));
 	}
 
 	if (oldBatteryPower != batteryPower)
 	{
 		oldBatteryPower = batteryPower;
 		memset(tmpBuffer, 0, 128); // 更新电池电压
-		sprintf(tmpBuffer, "j0.val=\" %d\"\xff\xff\xff", batteryPower);
+		sprintf((char *)tmpBuffer, "j0.val=\" %d\"\xff\xff\xff", batteryPower);
 
 		memset(tmpBuffer, 0, 128); // 更新电池电压
-		sprintf(tmpBuffer, "click n0,0\xff\xff\xff");
-		USART1_SendStr(tmpBuffer, strlen(tmpBuffer));
+		sprintf((char *)tmpBuffer, "click n0,0\xff\xff\xff");
+		USART1_SendStr(tmpBuffer, strlen((const char *)tmpBuffer));
 	}
 }
 // 3S更新一次

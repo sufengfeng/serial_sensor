@@ -72,17 +72,17 @@ void USART2_Config(void);
 void USART3_Config(void);
 void USART1_IRQHandler(void);
 void USART2_IRQHandler(void);
-void USART1_SendByte(uint16_t Data);
-void USART2_SendByte(uint16_t Data);
-void USART3_SendByte(uint16_t Data);
+void USART1_SendByte(uint8_t Data);
+void USART2_SendByte(uint8_t Data);
+void USART3_SendByte(uint8_t Data);
 
-int USART1_SendStr(char *str, uint8_t len);
+int USART1_SendStr(uint8_t *str, uint8_t len);
 int USART2_SendStr(uint8_t *str, uint8_t len);
 void Set485SendMode(void);
 void Set485ReceiveMode(void);
 
 #define PROJ_PACE1004	0x01
 #define PROJ_SERIAL	0x02
-//#define PROJ_TYPE		PROJ_PACE1004
-#define PROJ_TYPE		PROJ_SERIAL
+#define PROJ_TYPE		PROJ_PACE1004		//默认配置USART1_Config(2400, 7, 2, 1);
+// #define PROJ_TYPE		PROJ_SERIAL
 #endif

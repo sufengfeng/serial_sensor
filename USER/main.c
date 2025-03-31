@@ -23,7 +23,7 @@ volatile uint8_t UART3_ReceiveState = 0;
 volatile uint8_t UART_IO_RxBuffer[UART_RX_BUFFER_SIZE] = {0x00};
 volatile uint8_t UART_IO_RxCount = 0;
 volatile uint8_t UART_IO_ReceiveState = 0;
-int UpdateUiInit(void);
+int UpdateToUI_SerialParam(void);
 int SendComandAutoZero(void);
 /*******************************************************************************
  * Function Name  : RCC_Config
@@ -185,7 +185,7 @@ uint8_t PACE_RESULT_HEAD[] = ":SEHS:PRES";
 // [Func_Task_1000ms01306][*IZ:][63]
 float g_fV_mbar = 0;
 float g_fV_psi = 0;				 // psi压力值
-float g_fV_rate = 0;			 // psi压力值变化率
+float g_fV_rate = 0.000001;		 // psi压力值变化率
 float g_fV_rateMax = 0.00145;	 // psi压力值变化率最大值
 uint8_t g_bIsAutoZero = 0;		 // 自动校零标志位
 uint8_t g_bIsAutoZeroReason = 0; // 自动校零原因	0：无，bit1：命令行，bit2：界面
@@ -220,7 +220,7 @@ void UART2_Frame_Handler(USART_TypeDef *USARTtype, volatile uint8_t buffer[], vo
 	}
 	else if (strncmp((const char *)buffer, ":SENS:PRES", strlen(":SENS:PRES")) <= 0)
 	{
-		float tmpValue = 0;
+		float tmpValue = 0.000001;
 		int iRet = 0;
 		iRet = sscanf((const char *)buffer, ":SENS:PRES:SLEW %f", &tmpValue);
 		if (iRet > 0)
@@ -239,7 +239,7 @@ void UART2_Frame_Handler(USART_TypeDef *USARTtype, volatile uint8_t buffer[], vo
 #define PR_COMMAND_LOCAL "LOCAL\r\n"		   // 设置为本地模式
 #define PR_COMMAND_REMOTE "REMOTE\r\n"		   // 设置为远程模式
 #define PR_COMMAND_CONF1 "CONF1"			   // 设置为本地模式
-#define PR_COMMAND_COM_PARAMETER "COM1 "	   // 设置串口参数
+// #define PR_COMMAND_COM_PARAMETER "COM1 "	   // 设置串口参数
 #define PR_COMMAND_AUTOZERO "AUTOZERO=RUN\r\n" // 自动校零UTOZERO
 #define PR_COMMAND_RATE "RATE\r\n"			   // 查询采样率
 #define PR_COMMAND_PR "PR\r\n"				   // 查询压力值
@@ -267,6 +267,25 @@ uint8_t Frame_CheckSum_(uint8_t *data, uint8_t len)
 }
 #include "math.h"
 
+#define MAX_MESSAGES 10
+#define MAX_MSG_LEN 32
+
+typedef struct
+{
+	char message[MAX_MSG_LEN];
+	int32_t len;
+	uint32_t trigger_time;
+} Message;
+
+typedef struct
+{
+	Message messages[MAX_MESSAGES];
+	uint8_t count;
+} MessageQueue;
+
+// 初始化消息队列
+MessageQueue msg_queue = {0};
+int enqueue_(MessageQueue *queue, const char *msg, uint32_t len, uint32_t delay);
 void ReponceComandPR(void)
 {
 	char sendBuffer[128];
@@ -285,7 +304,8 @@ void ReponceComandPR(void)
 		sprintf(tmpBuffer, "R       %s psi g\r\n", getFormatString(g_nValiddecimal - 1));
 		sprintf(sendBuffer, tmpBuffer, g_fV_psi);
 	}
-	USART1_SendStr(sendBuffer, strlen(sendBuffer));
+	enqueue_(&msg_queue, sendBuffer, strlen(sendBuffer), 200);
+	// USART1_SendStr(sendBuffer, strlen(sendBuffer));
 }
 void ReponceComandREAD(void)
 {
@@ -294,7 +314,74 @@ void ReponceComandREAD(void)
 	memset(sendBuffer, 0, 128);
 	sprintf(tmpBuffer, "%s\r\n", getFormatString(g_nValiddecimal - 1));
 	sprintf(sendBuffer, tmpBuffer, g_fV_psi);
-	USART1_SendStr(sendBuffer, strlen(sendBuffer));
+	enqueue_(&msg_queue, sendBuffer, strlen(sendBuffer), 200);
+	// USART1_SendStr(sendBuffer, strlen(sendBuffer));
+}
+
+// 全局累计变量
+volatile uint32_t tick_counter = 0;
+
+// 判断队列是否已满
+int is_queue_full(MessageQueue *queue)
+{
+	return queue->count >= MAX_MESSAGES;
+}
+
+// 判断队列是否为空
+int is_queue_empty(MessageQueue *queue)
+{
+	return queue->count == 0;
+}
+
+// 入队函数，按 trigger_time 升序插入
+int enqueue_(MessageQueue *queue, const char *msg, uint32_t len, uint32_t delay)
+{
+	if (is_queue_full(queue))
+	{
+		return -1;
+	}
+
+	Message new_msg;
+	memcpy(new_msg.message, msg, len);
+	new_msg.len = len;
+	new_msg.trigger_time = tick_counter + delay;
+
+	// 查找插入位置
+	uint8_t insert_index = 0;
+	while (insert_index < queue->count && queue->messages[insert_index].trigger_time < new_msg.trigger_time)
+	{
+		insert_index++;
+	}
+
+	// 移动元素为新消息腾出位置
+	for (uint8_t i = queue->count; i > insert_index; i--)
+	{
+		queue->messages[i] = queue->messages[i - 1];
+	}
+
+	// 插入新消息
+	queue->messages[insert_index] = new_msg;
+	queue->count++;
+
+	return 0;
+}
+
+// 处理消息队列
+void process_message_queue(MessageQueue *queue)
+{
+	while (!is_queue_empty(queue) && queue->messages[0].trigger_time <= tick_counter)
+	{
+		// 这里可以添加发送消息的具体逻辑
+		// 例如调用某个函数发送消息
+		USART1_SendStr((uint8_t*)(queue->messages[0].message), queue->messages[0].len);
+
+		// 移除已处理的消息
+		for (uint8_t i = 0; i < queue->count - 1; i++)
+		{
+			queue->messages[i] = queue->messages[i + 1];
+		}
+		queue->count--;
+	}
 }
 
 /*******************************************************************************
@@ -317,22 +404,25 @@ void HandleOutsideCommand(USART_TypeDef *USARTtype, volatile uint8_t buffer[], v
 	// 	printf(" ");
 	// }
 	// printf("\n");
-	if (!strncmp((const char *)buffer, PR_COMMAND_CLS, strlen(PR_COMMAND_CLS))) // 清屏
+	if (!strncmp((const char *)buffer, PR_COMMAND_CLS, strlen(PR_COMMAND_CLS)-1)) // 清屏
 	{
 		g_bFlageStatus = 1; // 收到命令
-		USART1_SendStr(PR_RESPONE_OK, strlen(PR_RESPONE_OK));
+		enqueue_(&msg_queue, PR_RESPONE_OK, strlen(PR_RESPONE_OK), 200);
+		// USART1_SendStr(PR_RESPONE_OK, strlen(PR_RESPONE_OK));
 	}
-	else if (!strncmp((const char *)buffer, PR_COMMAND_LOCAL, strlen(PR_COMMAND_LOCAL))) // 设置为本地模式
+	else if (!strncmp((const char *)buffer, PR_COMMAND_LOCAL, strlen(PR_COMMAND_LOCAL)-1)) // 设置为本地模式
 	{
 		g_bFlageStatus = 1;
-		USART1_SendStr((char *)buffer, len);
+		enqueue_(&msg_queue, PR_COMMAND_LOCAL, strlen(PR_COMMAND_LOCAL), 200);
+		// USART1_SendStr(PR_COMMAND_LOCAL, strlen(PR_COMMAND_LOCAL));
 	}
-	else if (!strncmp((const char *)buffer, PR_COMMAND_REMOTE, strlen(PR_COMMAND_REMOTE))) // 设置为远程模式
+	else if (!strncmp((const char *)buffer, PR_COMMAND_REMOTE, strlen(PR_COMMAND_REMOTE)-1)) // 设置为远程模式
 	{
 		g_bFlageStatus = 1;
-		USART1_SendStr((char *)buffer, len);
+		enqueue_(&msg_queue, PR_COMMAND_REMOTE, strlen(PR_COMMAND_REMOTE), 200);
+		// USART1_SendStr(PR_COMMAND_REMOTE, strlen(PR_COMMAND_REMOTE));
 	}
-	else if (!strncmp((const char *)buffer, PR_COMMAND_AUTOZERO, strlen(PR_COMMAND_AUTOZERO))) // 自动校零
+	else if (!strncmp((const char *)buffer, PR_COMMAND_AUTOZERO, strlen(PR_COMMAND_AUTOZERO)-1)) // 自动校零
 	{
 		g_bFlageStatus = 1;
 		g_bIsAutoZero = 1;
@@ -341,9 +431,10 @@ void HandleOutsideCommand(USART_TypeDef *USARTtype, volatile uint8_t buffer[], v
 	else if (!strncmp((const char *)buffer, PR_COMMAND_CONF1, strlen(PR_COMMAND_CONF1))) // 自动校零
 	{
 		g_bFlageStatus = 1;
-		USART1_SendStr(PR_RESPONE_OK, strlen(PR_RESPONE_OK));
+		enqueue_(&msg_queue, PR_RESPONE_OK, strlen(PR_RESPONE_OK), 200);
+		// USART1_SendStr(PR_RESPONE_OK, strlen(PR_RESPONE_OK));
 	}
-	else if (!strncmp((const char *)buffer, PR_COMMAND_RATE, strlen(PR_COMMAND_RATE))) // 查询采样率
+	else if (!strncmp((const char *)buffer, PR_COMMAND_RATE, strlen(PR_COMMAND_RATE)-1)) // 查询采样率
 	{
 		g_bFlageStatus = 1;
 		char sendBuffer[128];
@@ -351,43 +442,45 @@ void HandleOutsideCommand(USART_TypeDef *USARTtype, volatile uint8_t buffer[], v
 		memset(sendBuffer, 0, 128);
 		sprintf(tmpBuffer, "%s psi/s\r\n", getFormatString(g_nValiddecimal - 1));
 		sprintf(sendBuffer, tmpBuffer, g_fV_rate);
-		USART1_SendStr(sendBuffer, strlen(sendBuffer));
+		// USART1_SendStr(sendBuffer, strlen(sendBuffer));
+		enqueue_(&msg_queue, sendBuffer, strlen(sendBuffer), 200);
 	}
-	else if (!strncmp((const char *)buffer, PR_COMMAND_PR, strlen(PR_COMMAND_PR)))
+	else if (!strncmp((const char *)buffer, PR_COMMAND_PR, strlen(PR_COMMAND_PR)-1))
 	{
 		g_bFlageStatus = 1;
 		ReponceComandPR();
 	}
-	else if (!strncmp((const char *)buffer, PR_COMMAND_PR_, strlen(PR_COMMAND_PR_)))
+	else if (!strncmp((const char *)buffer, PR_COMMAND_PR_, strlen(PR_COMMAND_PR_)-1))
 	{
 		g_bFlageStatus = 1;
 		ReponceComandPR();
 	}
-	else if (!strncmp((const char *)buffer, PR_COMMAND_pr, strlen(PR_COMMAND_pr)))
+	else if (!strncmp((const char *)buffer, PR_COMMAND_pr, strlen(PR_COMMAND_pr)-1))
 	{
 		g_bFlageStatus = 1;
 		ReponceComandPR();
 	}
-	else if (!strncmp((const char *)buffer, PR_COMMAND_pr_, strlen(PR_COMMAND_pr_)))
+	else if (!strncmp((const char *)buffer, PR_COMMAND_pr_, strlen(PR_COMMAND_pr_)-1))
 	{
 		g_bFlageStatus = 1;
 		ReponceComandPR();
 	}
 
-	else if (!strncmp((const char *)buffer, PR_COMMAND_READ, strlen(PR_COMMAND_READ)))
+	else if (!strncmp((const char *)buffer, PR_COMMAND_READ, strlen(PR_COMMAND_READ)-1))
 	{
 		g_bFlageStatus = 1;
 		ReponceComandPR();
 	}
-	else if (!strncmp((const char *)buffer, PR_COMMAND_READ1, strlen(PR_COMMAND_READ1)))
+	else if (!strncmp((const char *)buffer, PR_COMMAND_READ1, strlen(PR_COMMAND_READ1)-1))
 	{
 		g_bFlageStatus = 1;
 		ReponceComandREAD();
 	}
-	else if (!strncmp((const char *)buffer, COMAND_COM1_SET, strlen(COMAND_COM1_SET)))
+	else if (!strncmp((const char *)buffer, COMAND_COM1_SET, strlen(COMAND_COM1_SET)-1))
 	{
 		g_bFlageStatus = 1;
-		USART1_SendStr(COMAND_COM1_SET_RES, strlen(COMAND_COM1_SET_RES));
+		enqueue_(&msg_queue, COMAND_COM1_SET_RES, strlen(COMAND_COM1_SET_RES), 200);
+		// USART1_SendStr(COMAND_COM1_SET_RES, strlen(COMAND_COM1_SET_RES));
 	}
 	else
 	{
@@ -403,7 +496,7 @@ void HandleOutsideCommand(USART_TypeDef *USARTtype, volatile uint8_t buffer[], v
  *******************************************************************************/
 void HandleUartShow(USART_TypeDef *USARTtype, volatile uint8_t buffer[], volatile uint8_t len)
 {
-	printf("[%s%d][%s][%d]\n", __func__, __LINE__, buffer, len);
+	printf("[%s-%d][%s][%d]\n", __func__, __LINE__, buffer, len);
 	if (!strncmp((const char *)buffer, UI_COMMAND_AZ, strlen(UI_COMMAND_AZ))) // 收到命令
 	{
 		g_bIsAutoZero = 1;
@@ -469,7 +562,7 @@ void HandleUartShow(USART_TypeDef *USARTtype, volatile uint8_t buffer[], volatil
 	}
 	else if (!strncmp((const char *)buffer, "page_com_setting", strlen("page_com_setting"))) //"page_com_setting"	保存串口参数
 	{
-		UpdateUiInit(); //
+		UpdateToUI_SerialParam(); //
 	}
 	else if (!strncmp((const char *)buffer, "Cmd_SetLocal", strlen("Cmd_SetLocal"))) //"Cmd_SetLocal"	本地控制
 	{
@@ -522,7 +615,7 @@ void ControlAutoZero(void) // 控制自动校零
 		case 1:
 		{
 			static int counter = 0;
-			if (counter++ >= 6)
+			if (counter++ >= 4)
 			{ // 等待600ms
 				counter = 0;
 				stepZero = 2;
@@ -538,7 +631,7 @@ void ControlAutoZero(void) // 控制自动校零
 		case 3:
 		{
 			static int counter = 0;
-			if (counter++ >= 4)
+			if (counter++ >= 2)
 			{ // 等待400ms
 				counter = 0;
 				stepZero = 4;
@@ -556,12 +649,14 @@ void ControlAutoZero(void) // 控制自动校零
 			}
 			else if (g_bIsAutoZeroReason & 0x02)
 			{
-				USART1_SendStr(PR_RESPONE_OK, strlen(PR_RESPONE_OK)); // 发送校零命令响应
+				// USART1_SendStr(PR_RESPONE_OK, strlen(PR_RESPONE_OK)); // 发送校零命令响应
+				enqueue_(&msg_queue, PR_RESPONE_OK, strlen(PR_RESPONE_OK), 0);
 				printf("[%s][%d]AutoZero command Done!!\n", __func__, __LINE__);
 			}
 			else
 			{
-				USART1_SendStr(PR_RESPONE_OK, strlen(PR_RESPONE_OK)); // 发送校零命令响应
+				// USART1_SendStr(PR_RESPONE_OK, strlen(PR_RESPONE_OK)); // 发送校零命令响应
+				enqueue_(&msg_queue, PR_RESPONE_OK, strlen(PR_RESPONE_OK), 0);
 				printf("[%s][%d]AutoZero Done!!\n", __func__, __LINE__);
 			}
 			g_bIsAutoZeroReason = 0;
@@ -631,22 +726,13 @@ void Func_Task_100ms01(void)
 #endif
 
 	ControlAutoZero(); // 控制自动校零
-// Uart_SendByte('O');
-#if DEBUG_SIMULATOR
-	Uart_IO_SendByte(0x5A);
-	//  Uart_SendByte(0x5B);
-	// USART1_SendStr("777777777777777", sizeof("777777777777777"));
-	// static uint8_t counter = 0;
-	// Uart_SendByte(counter); // 发送数据}
-	// counter++;
-#endif
 }
 int SendComandAutoZero(void)
 {
 	return USART2_SendStr(SENSOR_COMMAND_AZ, strlen(SENSOR_COMMAND_AZ)); // 发送查询命令
 }
 // 周期更新数据到串口屏
-int UpdateUiPeriod(void)
+int UpdateToUI_PSI(void)
 {
 	static float last_V_psi = 0;
 	last_V_psi = g_fV_psi;
@@ -681,7 +767,7 @@ int UpdateUiPeriod(void)
 	return 0;
 }
 // 周期更新数据到串口屏
-int UpdateUiInit(void)
+int UpdateToUI_SerialParam(void)
 {
 	char sendBuffer[128];
 	char tmpBuffer[128];
@@ -696,7 +782,7 @@ int UpdateUiInit(void)
 	Uart_IO_SendByteStr(sendBuffer, strlen(sendBuffer));
 
 	memset(sendBuffer, 0, 128);
-	sprintf(sendBuffer, "com_setting.cb2.txt=\"%d\"\xff\xff\xff", p_sGlobalBasicParam->m_nStopBits); // 停止位
+	sprintf(sendBuffer, "com_setting.cb2.txt=\"%d\"\xff\xff\xff", p_sGlobalBasicParam->m_nStopBits + 1); // 停止位
 	Uart_IO_SendByteStr(sendBuffer, strlen(sendBuffer));
 
 	if (p_sGlobalBasicParam->m_nParity == NO_PARITY)
@@ -733,14 +819,15 @@ void TriggerBoardLed(void)
 // 1000ms回调事件
 void Func_Task_1000ms01(void)
 {
-#if DEBUG_SIMULATOR == 0
-	TriggerBoardLed();
-#endif
+	// printf("[%s][%d]\n", __func__, __LINE__);
 #if PROJ_TYPE == PROJ_PACE1004
-#else
 
-	UpdateUiPeriod(); // 周期更新数据到串口屏
+#else
+#if DEBUG_SIMULATOR == 0
+	UpdateToUI_PSI();
+#endif // 周期更新数据到串口屏
 #endif
+
 	ControlShowLed();			  // 控制气体是否稳定显示灯
 	ControlRemoteStatue();		  // 远程控制状态显示
 	static uint8_t counter3s = 0; // 3s计数器
@@ -749,6 +836,20 @@ void Func_Task_1000ms01(void)
 		counter3s = 0;
 		// BatteryManagementTask(); // 电池管理任务
 	}
+#if DEBUG_SIMULATOR
+	// 	Uart_IO_SendByte('O');
+	Uart_IO_SendByte(0x5A);
+	Uart_IO_SendByte(0x5B);
+	Uart_IO_SendByte(0x5C);
+	Uart_IO_SendByte(0x5D);
+	Uart_IO_SendByte(0x5E);
+	// USART1_SendStr("777777777777777", sizeof("777777777777777"));
+	// static uint8_t counter = 0;
+	// Uart_IO_SendByte(counter); // 发送数据}
+	// counter++;
+#else
+	TriggerBoardLed(); // 触发板灯
+#endif
 }
 // 1ms中断事件
 void Func_Task_Interrupt(void)
@@ -770,18 +871,27 @@ void Func_Task_Interrupt(void)
 volatile SoftTimer g_sTimerArray[] = {
 	{0, 1, Func_Task_1ms01},
 	{5, 9, Func_Task_10ms01},
-	{37, 99, Func_Task_100ms01},
 	{23, 49, Func_Task_50ms01},
+	{37, 99, Func_Task_100ms01},
 	{373, 999, Func_Task_1000ms01},
 };
 
-// Systik定时器中断更新定时器 10ms调度一次
+// Systik定时器中断更新定时器 1ms调度一次
 void UpdataSoftTimer(void)
 {
 	Func_Task_Interrupt(); // 中断回调服务函数
 	for (uint32_t i = 0; i < sizeof(g_sTimerArray) / sizeof(SoftTimer); i++)
 	{ // 更新软定时器
 		g_sTimerArray[i].m_nCounter++;
+	}
+	tick_counter++;
+	if (tick_counter == 0)
+	{
+		// 处理越界情况，重新计算所有消息的触发时间
+		for (uint8_t i = 0; i < msg_queue.count; i++)
+		{
+			msg_queue.messages[i].trigger_time -= UINT32_MAX;
+		}
 	}
 }
 // 定时器任务调度
@@ -826,8 +936,8 @@ int main(void)
 	LoadBasicParamFromFlash(GetBasicParamHandle()); // 从Flash中读取基本参数
 	p_sGlobalBasicParam->m_nAppVersion = GetSoftVersion(IMAGE_VER);
 #if PROJ_TYPE == PROJ_PACE1004
-	USART1_Config(2400, 7, 2, 1);
- 	//USART1_Config(19200, 7, 0, 2);
+	// USART1_Config(2400, 7, 2, 1);
+	USART1_Config(19200, 7, 0, 2);
 #else
 	USART1_Config(p_sGlobalBasicParam->m_nBaudRate, p_sGlobalBasicParam->m_nWordLength, p_sGlobalBasicParam->m_nParity, p_sGlobalBasicParam->m_nStopBits); // 初始化定时器3
 #endif
@@ -842,9 +952,9 @@ int main(void)
 
 	USART_GPIO_Init(); // 初始化串口GPIO
 	Timer3_Init();	   // 初始化定时器3
-
-	UpdateUiInit(); // 初始化串口屏UI
-	// Uart_SendByte(0x04);
+#ifndef DEBUG_SIMULATOR
+	UpdateToUI_SerialParam(); // 初始化串口屏UI
+#endif
 	// USART1_SendStr("OK");
 	printf("Init Done\n");
 	LOG(LOG_CRIT, "\n\rCopyright (c) 2024,Borui_Zhixin All rights reserved.\n\rRelease SafePLC version=[0x%08lx] %s-%s\r\n", p_sGlobalBasicParam->m_nAppVersion, __DATE__, __TIME__);
@@ -856,7 +966,7 @@ int main(void)
 	while (1)
 	{
 		// 如果UART1接收到1帧数据
-		if (UART1_ReceiveState == 1) // 串口屏
+		if (UART1_ReceiveState == 1)
 		{
 			HandleOutsideCommand(USART1, UART1_RxBuffer, UART1_RxCount); // 处理外部命令数据
 			UART1_ReceiveState = 0;
@@ -877,12 +987,13 @@ int main(void)
 			UART3_RxCount = 0;
 		}
 		// 如果UART2接收到1帧数据
-		if (UART_IO_ReceiveState == 1) // 外部IO
+		if (UART_IO_ReceiveState == 1) // 串口屏 // 外部IO模拟
 		{
 			HandleUartShow(NULL, UART_IO_RxBuffer, UART_IO_RxCount); // 处理串口屏数据
 			UART_IO_ReceiveState = 0;
 			UART_IO_RxCount = 0;
 		}
-		TaskSchedule();
+		TaskSchedule();					   // 任务调度
+		process_message_queue(&msg_queue); // 处理消息队列
 	}
 }

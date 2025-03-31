@@ -45,25 +45,16 @@ void USART1_Config(int BAUD_RATE, int USART_WordLength, int USART_Parity, int US
 	if (USART_WordLength < 7 || USART_WordLength > 9)
 	{
 		USART_WordLength = 8;
-	}
-	else
-	{
 		LOG(LOG_ERR, "Invalid USART_WordLength, using default 8\n");
 	}
 	if (USART_Parity < NO_PARITY || USART_Parity > EVEN_PARITY)
 	{
 		USART_Parity = NO_PARITY;
-	}
-	else
-	{
 		LOG(LOG_ERR, "Invalid USART_Parity, using default NO_PARITY\n");
 	}
 	if (USART_StopBits < ONE_STOP_BIT || USART_StopBits > TWO_STOP_BITS)
 	{
 		USART_StopBits = ONE_STOP_BIT;
-	}
-	else
-	{
 		LOG(LOG_ERR, "Invalid USART_StopBits, using default ONE_STOP_BIT\n");
 	}
 
@@ -103,40 +94,25 @@ void USART1_Config(int BAUD_RATE, int USART_WordLength, int USART_Parity, int US
 
 	USART_InitStructure.USART_BaudRate = baud_rate;
 	USART_InitStructure.USART_WordLength = USART_WordLength_8b;
+	// 配置停止位
+	if (l_sStopBitMode == ONE_STOP_BIT)
+	{
+		USART_InitStructure.USART_StopBits = USART_StopBits_1;
+	}
+	else
+	{
+		USART_InitStructure.USART_StopBits = USART_StopBits_2;
+	}
 	if (l_nUartWordLength == 7)
 	{
-		// 7 N 1		8 N 0.5
-		// 7 N 2		8 N 1
+		// 7 N 1		8 N 1
+		// 7 N 2		8 N 2
 		// 7 O 1		8 N 1
 		// 7 O 2		8 N 2
 		// 7 E 1		8 N 1
 		// 7 E 2		8 N 2
-		if (l_sParityMode == NO_PARITY)
-		{
-			USART_InitStructure.USART_Parity = USART_Parity_No;
-			// 配置停止位
-			if (l_sStopBitMode == ONE_STOP_BIT)
-			{
-				USART_InitStructure.USART_StopBits = USART_StopBits_0_5;
-			}
-			else
-			{
-				USART_InitStructure.USART_StopBits = USART_StopBits_1;
-			}
-		}
-		else
-		{
-			USART_InitStructure.USART_Parity = USART_Parity_No;
-			// 配置停止位
-			if (l_sStopBitMode == ONE_STOP_BIT)
-			{
-				USART_InitStructure.USART_StopBits = USART_StopBits_1;
-			}
-			else
-			{
-				USART_InitStructure.USART_StopBits = USART_StopBits_2;
-			}
-		}
+
+		USART_InitStructure.USART_Parity = USART_Parity_No;
 	}
 	else
 	{
@@ -160,15 +136,6 @@ void USART1_Config(int BAUD_RATE, int USART_WordLength, int USART_Parity, int US
 			USART_InitStructure.USART_Parity = USART_Parity_Even;
 		}
 
-		// 配置停止位
-		if (l_sStopBitMode == ONE_STOP_BIT)
-		{
-			USART_InitStructure.USART_StopBits = USART_StopBits_1;
-		}
-		else
-		{
-			USART_InitStructure.USART_StopBits = USART_StopBits_2;
-		}
 		// 9 N 1		9 N 1
 		// 9 N 2		9 N 2
 		// 9 O 1		9 O 1
@@ -180,6 +147,7 @@ void USART1_Config(int BAUD_RATE, int USART_WordLength, int USART_Parity, int US
 			USART_InitStructure.USART_WordLength = USART_WordLength_9b;
 		}
 	}
+
 	USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
 	USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
 	USART_Init(USARTx, &USART_InitStructure);
@@ -233,11 +201,11 @@ void USART2_Config(void)
 	USART_ClockInitStructure.USART_CPHA = USART_CPHA_2Edge;
 	USART_ClockInitStructure.USART_LastBit = USART_LastBit_Disable;
 	USART_ClockInit(USARTx, &USART_ClockInitStructure);
-	#if PROJ_TYPE == PROJ_PACE1004
+#if PROJ_TYPE == PROJ_PACE1004
 	USART_InitStructure.USART_BaudRate = 9600;
-	#else
+#else
 	USART_InitStructure.USART_BaudRate = 19200;
-	#endif
+#endif
 	USART_InitStructure.USART_WordLength = USART_WordLength_8b;
 	USART_InitStructure.USART_StopBits = USART_StopBits_1;
 	USART_InitStructure.USART_Parity = USART_Parity_No;
@@ -352,8 +320,10 @@ void USART1_IRQHandler(void)
 		{ // 如果是7位数据，那么只取低7位数据
 			tmpValue &= 0x7F;
 		}
-		// 把接收到的字节保存，数组地址加1
-		UART1_RxBuffer[UART1_RxCount++] = tmpValue;
+		if (UART1_RxCount < sizeof(UART1_RxBuffer)) // 添加边界检查
+		{
+			UART1_RxBuffer[UART1_RxCount++] = tmpValue;
+		}
 	}
 	// 如果接收到1帧数据
 	else if (USART_GetITStatus(USART1, USART_IT_IDLE) != RESET)
@@ -423,12 +393,11 @@ void USART3_IRQHandler(void)
 	}
 }
 
-// 函数用于计算并设置奇偶校验位
 unsigned char setParityBit(unsigned char Data, ParityMode checkMode)
 {
-	unsigned char last7Bits = Data & 0x7F; // 获取Data的最后7位
+	unsigned char last7Bits = Data & 0x7F; 
 	unsigned char parityBit = 0;
-	// 计算最后7位中1的个数
+	
 	for (int i = 0; i < 7; i++)
 	{
 		parityBit ^= (last7Bits >> i) & 0x01;
@@ -437,6 +406,7 @@ unsigned char setParityBit(unsigned char Data, ParityMode checkMode)
 	switch (checkMode)
 	{
 	case NO_PARITY:
+		parityBit = 1;
 		break;
 	case ODD_PARITY:
 		if (parityBit == 0)
@@ -445,17 +415,13 @@ unsigned char setParityBit(unsigned char Data, ParityMode checkMode)
 		}
 		break;
 	case EVEN_PARITY:
-		if (parityBit == 1)
-		{
-			parityBit = 0;
-		}
+		// 偶数校验，不需要额外处理
 		break;
-	}
-
-	Data &= 0x7F;			  // 先清除原来的最高位（假设原来最高位可能有值）
-	Data |= (parityBit << 7); // 将奇偶校验位放到最高位
+	}			  
+	Data = last7Bits|(parityBit << 7); 
 	return Data;
 }
+
 
 /*******************************************************************************
 * Function Name : USART1_SendByte
@@ -463,46 +429,47 @@ unsigned char setParityBit(unsigned char Data, ParityMode checkMode)
 									Data = 要发送的数据
 * Return        : None
 *******************************************************************************/
-void USART1_SendByte(uint16_t Data)
+void USART1_SendByte(uint8_t Data)
 {
 	if (l_nUartWordLength == 7)
 	{ // 如果是7位数据，那么只取低7位数据
 		Data = setParityBit((unsigned char)Data, l_sParityMode);
 	}
 	USART_TypeDef *USARTx = USART1;
-	USARTx->DR = (Data & (uint16_t)0x01FF);
+	USARTx->DR = Data;
 	while (USART_GetFlagStatus(USARTx, USART_FLAG_TC) != SET)
 		;
 }
-int USART1_SendStr(char *str, uint8_t len)
+int USART1_SendStr(uint8_t *str, uint8_t len)
 {
-	while (*str != '\0')
+
+	for (uint8_t i = 0; i < len; i++)
 	{
-		USART1_SendByte(*str++);
+		USART1_SendByte(str[i]);
 	}
-	return 0;
+	return len;
 }
 /*******************************************************************************
-* Function Name : USART1_SendByte
-* Description   : 向USART1发送一个字节
+* Function Name : USART2_SendByte
+* Description   : 向USART2发送一个字节
 									Data = 要发送的数据
 * Return        : None
 *******************************************************************************/
-void USART2_SendByte(uint16_t Data)
+void USART2_SendByte(uint8_t Data)
 {
 	USART_TypeDef *USARTx = USART2;
-	USARTx->DR = (Data & (uint16_t)0x01FF);
+	USARTx->DR = Data;
 	while (USART_GetFlagStatus(USARTx, USART_FLAG_TC) != SET)
 		;
 }
 
 int USART2_SendStr(uint8_t *str, uint8_t len)
 {
-	while (*str != '\0')
+	for (uint8_t i = 0; i < len; i++)
 	{
-		USART2_SendByte(*str++);
+		USART2_SendByte(str[i]);
 	}
-	return 0;
+	return len;
 }
 
 /*******************************************************************************
@@ -511,11 +478,11 @@ int USART2_SendStr(uint8_t *str, uint8_t len)
 									Data = 要发送的数据
 * Return        : None
 *******************************************************************************/
-void USART3_SendByte(uint16_t Data)
+void USART3_SendByte(uint8_t Data)
 {
 	Set485SendMode();
 	USART_TypeDef *USARTx = USART3;
-	USARTx->DR = (Data & (uint16_t)0x01FF);
+	USARTx->DR = Data;
 	while (USART_GetFlagStatus(USARTx, USART_FLAG_TC) != SET)
 		;
 	Set485ReceiveMode();
@@ -523,18 +490,11 @@ void USART3_SendByte(uint16_t Data)
 
 int USART3_SendStr(char *str, uint8_t len)
 {
-	USART_TypeDef *USARTx = USART3;
-	Set485SendMode();
-	while (*str != '\0')
+	for (uint8_t i = 0; i < len; i++)
 	{
-		uint16_t Data = *str++;
-		USARTx->DR = (Data & (uint16_t)0x01FF);
-		while (USART_GetFlagStatus(USARTx, USART_FLAG_TC) != SET)
-			;
-		USART1_SendByte(*str++);
+		USART3_SendByte(str[i]);
 	}
-	Set485ReceiveMode();
-	return 0;
+	return len;
 }
 
 #include "stdio.h"
